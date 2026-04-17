@@ -2,6 +2,7 @@ import pytest
 import base64
 import time
 import sys
+import csv
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,22 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from common.http_utils import HttpUtils
 from config import settings
+
+
+def load_phones_from_csv():
+    """从 CSV 文件加载手机号列表。"""
+    data_file = PROJECT_ROOT / "data" / "login_phone.csv"
+    phones = []
+    with data_file.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            phone = (row.get("phone_number") or "").strip()
+            if phone:
+                phones.append(phone)
+    return phones
+
+
+PHONE_CASES = load_phones_from_csv()
 
 
 def _to_base64(value):
@@ -133,11 +150,12 @@ def test_create_login_phone_params_contains_required_fields():
 
 
 @pytest.mark.api
-def test_login_phone_api(request, encrypt_key):
+@pytest.mark.parametrize("phone_number", PHONE_CASES, ids=lambda x: f"phone={x}")
+def test_login_phone_api(request, encrypt_key, phone_number):
     if not request.config.getoption("--run-api"):
         pytest.skip("need --run-api option to execute real API tests")
 
-    payload = create_login_phone_params()
+    payload = create_login_phone_params(phone_number=phone_number)
     response = login_with_phone(payload, encrypt_key)
 
     assert response is not None
@@ -145,8 +163,8 @@ def test_login_phone_api(request, encrypt_key):
 
     login_success = _is_login_success(response)
 
-    print(f"[login_phone] 响应: {response}")
-    print(f"[login_phone] 登录结果: success={login_success}")
+    print(f"[login_phone] phone={phone_number}, 响应: {response}")
+    print(f"[login_phone] phone={phone_number}, 登录结果: success={login_success}")
 
     if not login_success:
         error_message = (
@@ -158,7 +176,7 @@ def test_login_phone_api(request, encrypt_key):
             or "未知错误"
         )
         pytest.fail(
-            f"登录失败: code={response.get('code')}, "
+            f"登录失败: phone={phone_number}, code={response.get('code')}, "
             f"stayCode={response.get('stayCode')}, message={error_message}, response={response}"
         )
 

@@ -1,5 +1,6 @@
 import pytest
 import sys
+import csv
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,22 @@ from common.http_utils import HttpUtils
 from config import settings
 
 REGISTER_TEST_PHONE = "13900011111"
+
+
+def load_phones_from_csv():
+    """从 CSV 文件加载注册手机号列表。"""
+    data_file = PROJECT_ROOT / "data" / "register_phone.csv"
+    phones = []
+    with data_file.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            phone = (row.get("phone_number") or "").strip()
+            if phone:
+                phones.append(phone)
+    return phones
+
+
+PHONE_CASES = load_phones_from_csv()
 
 def send_verification_code(params, encrypt_key):
     """发送验证码"""
@@ -164,7 +181,7 @@ def test_create_register_params_contains_required_fields():
 
 
 @pytest.mark.api
-@pytest.mark.parametrize("phone_number", [REGISTER_TEST_PHONE])
+@pytest.mark.parametrize("phone_number", PHONE_CASES, ids=lambda x: f"phone={x}")
 def test_send_code_api(phone_number, encrypt_key):
     send_code_params = create_send_code_params(phone_number)
     response = send_verification_code(send_code_params, encrypt_key)
@@ -176,8 +193,17 @@ def test_send_code_api(phone_number, encrypt_key):
 
 
 @pytest.mark.api
-@pytest.mark.parametrize("phone_number,verification_code", [(REGISTER_TEST_PHONE, "8888")])
-def test_register_api(phone_number, verification_code, encrypt_key):
+@pytest.mark.parametrize("phone_number", PHONE_CASES, ids=lambda x: f"phone={x}")
+def test_register_api(phone_number, encrypt_key):
+    send_code_params = create_send_code_params(phone_number)
+    send_code_response = send_verification_code(send_code_params, encrypt_key)
+    print(f"[注册前发码] 手机号={phone_number}, 响应={send_code_response}")
+
+    assert send_code_response is not None
+    assert isinstance(send_code_response, dict)
+    assert "code" in send_code_response
+
+    verification_code = "8888"
     register_params = create_register_params(
         phone_number=phone_number,
         verification_code=verification_code
