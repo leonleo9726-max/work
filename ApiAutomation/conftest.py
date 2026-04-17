@@ -1,20 +1,26 @@
 import pytest
+from config import settings
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-api",
+        action="store_true",
+        default=False,
+        help="run tests that call external APIs",
+    )
+
 
 @pytest.fixture(scope="session")
 def base_url():
-    return "https://api.eastpointtest.com"
+    return settings.BASE_URL
 
 @pytest.fixture(scope="function")
 def default_headers():
     """基础请求头信息"""
-    return {
-        'content-type': 'application/json',
-        'locale': 'zh',
-        'appLanguage': 'en',
-        'app-type': '0',
-        'content-sign': 'sat1',
-        'content-status': '1',
-        'platform-type': '0',
-        'variant-type': '0',
-        'build-version': '317'
-    }
+    return settings.DEFAULT_HEADERS.copy()
+
+
+@pytest.fixture(scope="session")
+def encrypt_key():
+    return settings.TEST_ENCRYPT_KEY

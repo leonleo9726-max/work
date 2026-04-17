@@ -1,41 +1,29 @@
+import pytest
 import sys
-import os
-import time
+from pathlib import Path
 
-# 添加项目根目录到Python路径
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
-from common.sign_utils import SignUtils
+from config import settings
 
-def send_verification_code(params):
+REGISTER_TEST_PHONE = "13900011111"
+
+def send_verification_code(params, encrypt_key):
     """发送验证码"""
     try:
-        # API地址
-        url = "https://api.eastpointtest.com/user/stay/send-code"
-        
-        # 请求头
-        headers = {
-            'appLanguage': 'en',
-            'app-language': 'en',
-            'app-type': '0',
-            'content-sign': 'sat1',
-            'content-status': '1',
-            'platform-type': '0',
-            'variant-type': '0',
-            'build-version': '317'
-        }
-        
-        # 发送加密请求
+        url = f"{settings.BASE_URL}{settings.SEND_CODE_PATH}"
+        headers = settings.build_common_encrypted_headers()
+
         response = HttpUtils.post(
             url=url,
             data=params,
             headers=headers,
-            encrypt_key=SignUtils.test_encrypt_key
+            encrypt_key=encrypt_key
         )
-        
         return response
-        
     except Exception as e:
         print(f"发送验证码失败: {str(e)}")
         return {'code': 500, 'message': f'服务器内部错误: {str(e)}'}
@@ -137,69 +125,74 @@ def create_register_params(phone_number, area_code="86", verification_code="", *
     
     return default_params
 
-def register_user(params):
+def register_user(params, encrypt_key):
     """注册用户"""
     try:
-        # API地址
-        url = "https://api.eastpointtest.com/user/stay/login/phone"
-        
-        # 请求头
-        headers = {
-            'appLanguage': 'en',
-            'app-language': 'en',
-            'app-type': '0',
-            'content-sign': 'sat1',
-            'content-status': '1',
-            'platform-type': '0',
-            'variant-type': '0',
-            'build-version': '317'
-        }
-        
-        # 发送加密请求
+        url = f"{settings.BASE_URL}{settings.REGISTER_PATH}"
+        headers = settings.build_common_encrypted_headers()
+
         response = HttpUtils.post(
             url=url,
             data=params,
             headers=headers,
-            encrypt_key=test_encrypt_key
+            encrypt_key=encrypt_key
         )
-        
         return response
-        
     except Exception as e:
         print(f"注册失败: {str(e)}")
         return {'code': 500, 'message': f'服务器内部错误: {str(e)}'}
 
-if __name__ == '__main__':
-    # 循环注册从13800138001到13800138100
-    start_number = 13900010001
-    end_number = 13900010005
-    
-    for i in range(start_number, end_number + 1):
-        phone_number = str(i)
-        print(f"\n=== 开始处理手机号: {phone_number} ===")
-        
-        try:
-            # 发送验证码
-            send_code_params = create_send_code_params(phone_number)
-            code_result = send_verification_code(send_code_params)
-            print(f"发送验证码结果: {code_result}")
-            
-            # 休眠1秒，避免请求过快
-            time.sleep(1)
-            
-            # 注册用户
-            verification_code = "8888"  # 替换为收到的验证码
-            register_params = create_register_params(phone_number, verification_code=verification_code)
-            register_result = register_user(register_params)
-            print(f"注册结果: {register_result}")
-            
-            # 休眠2秒，避免请求过快
-            time.sleep(2)
-            
-        except Exception as e:
-            print(f"处理手机号 {phone_number} 时出错: {str(e)}")
-            # 出错时也休眠，避免请求过快
-            time.sleep(1)
-            continue  # 跳过错误，继续处理下一个
-    
-    print("\n=== 注册任务完成 ===")
+def test_create_send_code_params_contains_required_fields():
+    phone_number = REGISTER_TEST_PHONE
+    params = create_send_code_params(phone_number)
+
+    assert params["phoneNumber"] == phone_number
+    assert params["areaCode"] == "86"
+    assert params["userSmsType"] == 0
+    assert "ipAddress" in params
+
+
+def test_create_register_params_contains_required_fields():
+    phone_number = REGISTER_TEST_PHONE
+    verification_code = "8888"
+    params = create_register_params(phone_number, verification_code=verification_code)
+
+    assert params["phoneNumber"] == phone_number
+    assert params["verificationCode"] == verification_code
+    assert params["areaCode"] == "86"
+    assert "uniqueId" in params
+
+
+@pytest.mark.api
+@pytest.mark.parametrize("phone_number", [REGISTER_TEST_PHONE])
+def test_send_code_api(phone_number, encrypt_key):
+    send_code_params = create_send_code_params(phone_number)
+    response = send_verification_code(send_code_params, encrypt_key)
+
+    print(f"[发送验证码] 手机号={phone_number}, 响应={response}")
+    assert response is not None
+    assert isinstance(response, dict)
+    assert "code" in response
+
+
+@pytest.mark.api
+@pytest.mark.parametrize("phone_number,verification_code", [(REGISTER_TEST_PHONE, "8888")])
+def test_register_api(phone_number, verification_code, encrypt_key):
+    register_params = create_register_params(
+        phone_number=phone_number,
+        verification_code=verification_code
+    )
+    response = register_user(register_params, encrypt_key)
+
+    print(f"[注册请求] 手机号={phone_number}, 响应={response}")
+
+    assert response is not None
+    assert isinstance(response, dict)
+    assert "code" in response
+
+    if response.get("code") == 0:
+        print(f"[注册结果] 手机号 {phone_number} 注册成功")
+    else:
+        error_message = response.get("message") or response.get("msg") or "未知错误"
+        print(f"[注册结果] 手机号 {phone_number} 注册失败，code={response.get('code')}，message={error_message}")
+        pytest.fail(f"注册失败: code={response.get('code')}, message={error_message}")
