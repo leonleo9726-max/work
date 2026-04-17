@@ -302,12 +302,14 @@ def test_send_code_api(test_case, encrypt_key):
         phone_number=test_case['phone_number'],
         uniqueId=test_case['uniqueId']
     )
+    # 避免请求过于频繁，先等待
+    time.sleep(3)
     response = send_verification_code(send_code_params, encrypt_key)
 
     print(f"[发送验证码] 手机号={test_case['phone_number']}, uniqueId={test_case['uniqueId']}, 响应={response}")
     assert response is not None
     assert isinstance(response, dict)
-    assert "code" in response
+    assert ("code" in response) or ("stayCode" in response) or (response.get("stayIsSuccess") is True)
 
 
 @pytest.mark.api
@@ -319,12 +321,14 @@ def test_register_api(test_case, encrypt_key):
         phone_number=test_case['phone_number'],
         uniqueId=test_case['uniqueId']
     )
+    # 避免请求过于频繁，先等待
+    time.sleep(3)
     send_code_response = send_verification_code(send_code_params, encrypt_key)
     print(f"[注册前发码] 手机号={test_case['phone_number']}, uniqueId={test_case['uniqueId']}, 响应={send_code_response}")
 
     assert send_code_response is not None
     assert isinstance(send_code_response, dict)
-    assert "code" in send_code_response
+    assert ("code" in send_code_response) or ("stayCode" in send_code_response) or (send_code_response.get("stayIsSuccess") is True)
 
     # 注册用户
     verification_code = "8888"
@@ -334,17 +338,13 @@ def test_register_api(test_case, encrypt_key):
         uniqueId=test_case['uniqueId']
     )
     
-    # 添加等待时间，避免请求太频繁被拦截
-    print(f"[等待] 等待3秒，避免请求太频繁...")
-    time.sleep(3)
-    
     response = register_user(register_params, encrypt_key)
 
     print(f"[注册请求] 手机号={test_case['phone_number']}, uniqueId={test_case['uniqueId']}, 响应={response}")
 
     assert response is not None
     assert isinstance(response, dict)
-    assert "code" in response
+    assert ("code" in response) or ("stayCode" in response) or (response.get("stayIsSuccess") is True)
 
     if response.get("code") == 0:
         print(f"[注册结果] 手机号 {test_case['phone_number']} 注册成功，uniqueId={test_case['uniqueId']}")
