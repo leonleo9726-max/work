@@ -146,14 +146,23 @@ def extract_login_user_info(response):
     if not isinstance(response, dict):
         return None
 
-    data = response.get("data") if isinstance(response.get("data"), dict) else response
-    stay_user_id = data.get("stayUserId")
-    stay_token = data.get("stayToken")
-    if stay_user_id and stay_token:
-        return {
-            "stayUserId": str(stay_user_id),
-            "stayToken": str(stay_token),
-        }
+    candidates = []
+    if isinstance(response.get("stayResult"), dict):
+        candidates.append(response["stayResult"])
+    if isinstance(response.get("data"), dict):
+        candidates.append(response["data"])
+    candidates.append(response)
+
+    for data in candidates:
+        if not isinstance(data, dict):
+            continue
+        stay_user_id = data.get("stayUserId")
+        stay_token = data.get("stayToken")
+        if stay_user_id and stay_token:
+            return {
+                "stayUserId": str(stay_user_id),
+                "stayToken": str(stay_token),
+            }
     return None
 
 
@@ -177,6 +186,48 @@ def store_login_credentials(phone_number, login_info):
         "stayToken": token,
     }
     save_login_credentials_to_json()
+
+
+def login_phone_and_store(phone_number, encrypt_key, verification_code="8888", area_code="86", **kwargs):
+    """执行登录并存储登录凭证。"""
+    payload = create_login_phone_params(
+        phone_number=phone_number,
+        verification_code=verification_code,
+        area_code=area_code,
+        **kwargs,
+    )
+    response = login_with_phone(payload, encrypt_key)
+
+    if response is None or not isinstance(response, dict):
+        raise RuntimeError("登录接口返回为空或非 JSON 数据")
+
+    login_success = _is_login_success(response)
+    login_info = extract_login_user_info(response)
+    if login_info:
+        store_login_credentials(phone_number, login_info)
+
+    if not login_success:
+        error_message = (
+            response.get("stayErrorMessage")
+            or response.get("stayMessage")
+            or response.get("errorMessage")
+            or response.get("message")
+            or response.get("msg")
+            or "未知错误"
+        )
+        raise RuntimeError(
+            f"登录失败: phone={phone_number}, message={error_message}, response={response}"
+        )
+
+    return get_login_credentials_by_phone(phone_number)
+
+
+def ensure_login_credentials(phone_number, encrypt_key):
+    """确保存在指定手机号的登录凭证，必要时执行登录。"""
+    credential = get_login_credentials_by_phone(phone_number)
+    if credential:
+        return credential
+    return login_phone_and_store(phone_number, encrypt_key)
 
 
 def _ensure_login_credentials_file():
