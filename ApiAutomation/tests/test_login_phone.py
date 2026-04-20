@@ -1,5 +1,6 @@
 import pytest
 import base64
+import json
 import time
 import sys
 import csv
@@ -11,6 +12,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from common.http_utils import HttpUtils
 from config import settings
+
+LOGIN_CREDENTIALS_FILE = PROJECT_ROOT / "data" / "login_credentials.json"
 
 
 def load_phones_from_csv():
@@ -173,17 +176,65 @@ def store_login_credentials(phone_number, login_info):
         "stayUserId": user_id,
         "stayToken": token,
     }
+    save_login_credentials_to_json()
+
+
+def _ensure_login_credentials_file():
+    if not LOGIN_CREDENTIALS_FILE.parent.exists():
+        LOGIN_CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+def save_login_credentials_to_json():
+    _ensure_login_credentials_file()
+    with LOGIN_CREDENTIALS_FILE.open("w", encoding="utf-8") as file:
+        json.dump(LOGIN_CREDENTIALS, file, ensure_ascii=False, indent=2)
+
+
+def load_login_credentials_from_json():
+    if not LOGIN_CREDENTIALS_FILE.exists():
+        return {}
+    try:
+        with LOGIN_CREDENTIALS_FILE.open("r", encoding="utf-8") as file:
+            return json.load(file) or {}
+    except (json.JSONDecodeError, IOError):
+        return {}
 
 
 def get_login_credentials_by_user_id(stay_user_id):
-    return LOGIN_CREDENTIALS.get(str(stay_user_id))
+    user_id = str(stay_user_id)
+    if user_id in LOGIN_CREDENTIALS:
+        return LOGIN_CREDENTIALS[user_id]
+    persisted = load_login_credentials_from_json()
+    return persisted.get(user_id)
 
 
 def get_login_credentials_by_phone(phone_number):
     for value in LOGIN_CREDENTIALS.values():
         if value["phone_number"] == phone_number:
             return value
+    persisted = load_login_credentials_from_json()
+    for value in persisted.values():
+        if value.get("phone_number") == phone_number:
+            return value
     return None
+
+
+def build_business_headers_from_login(phone_number=None, stay_user_id=None):
+    """从持久化登录 token 构建后续业务请求的 headers。"""
+    credential = None
+    if phone_number:
+        credential = get_login_credentials_by_phone(phone_number)
+    elif stay_user_id:
+        credential = get_login_credentials_by_user_id(stay_user_id)
+
+    if credential is None:
+        raise ValueError(
+            "未找到登录凭证，请先执行登录并生成 data/login_credentials.json。"
+        )
+
+    headers = settings.build_common_encrypted_headers()
+    headers["Authorization"] = f"Bearer {credential['stayToken']}"
+    return headers, credential
 
 
 def test_create_login_phone_params_contains_required_fields():
