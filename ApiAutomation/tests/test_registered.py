@@ -43,9 +43,7 @@ def load_unique_ids_from_csv():
 
 def create_balanced_random_allocation():
     """
-    创建均衡随机分配策略
-    手机号数量 > uniqueId数量时，确保每个uniqueId被均匀使用
-    返回随机打乱的分配结果
+    为每个手机号随机分配提供的uniqueId，可循环使用
     """
     phones = load_phones_from_csv()
     unique_ids = load_unique_ids_from_csv()
@@ -54,32 +52,9 @@ def create_balanced_random_allocation():
         # 如果没有uniqueId，使用默认值
         unique_ids = ['00026a07e2434812b65b0c3b40678afe']
     
-    # 计算每个uniqueId应该分配的手机号数量
-    phone_count = len(phones)
-    unique_id_count = len(unique_ids)
-    
-    # 基础分配数量
-    base_allocations = phone_count // unique_id_count
-    remainder = phone_count % unique_id_count
-    
-    # 创建分配列表
-    allocations = []
-    for i in range(unique_id_count):
-        # 每个uniqueId分配的基础数量
-        count = base_allocations
-        # 前remainder个uniqueId多分配一个
-        if i < remainder:
-            count += 1
-        
-        # 添加uniqueId到分配列表
-        allocations.extend([unique_ids[i]] * count)
-    
-    # 随机打乱分配结果
-    random.shuffle(allocations)
-    
-    # 创建测试用例
     test_cases = []
-    for phone, unique_id in zip(phones, allocations):
+    for phone in phones:
+        unique_id = random.choice(unique_ids)
         test_case = {
             'phone_number': phone,
             'uniqueId': unique_id
@@ -254,12 +229,6 @@ def print_allocation_statistics():
             unique_id_usage[unique_id] = []
         unique_id_usage[unique_id].append(test_case['phone_number'])
     
-    print("\n" + "="*50)
-    print("uniqueId分配统计")
-    print("="*50)
-    print(f"总uniqueId数: {len(unique_id_usage)}")
-    print(f"总手机号数: {len(TEST_CASES)}")
-    print("-"*50)
     
     for unique_id, phones in unique_id_usage.items():
         print(f"uniqueId: {unique_id}")
@@ -272,7 +241,7 @@ def print_allocation_statistics():
             if len(phones) > 3:
                 sample_str += f", ...等{len(phones)}个"
             print(f"  手机号示例: {sample_str}")
-        print()
+        
     
     # 验证分配是否均衡
     counts = [len(phones) for phones in unique_id_usage.values()]
@@ -287,7 +256,6 @@ def print_allocation_statistics():
         else:
             print("⚠ 分配不够均衡")
     
-    print("="*50 + "\n")
 
 
 @pytest.mark.api

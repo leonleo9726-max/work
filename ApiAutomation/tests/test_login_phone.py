@@ -135,6 +135,57 @@ def _is_login_success(response):
     return False
 
 
+LOGIN_CREDENTIALS = {}
+
+
+def extract_login_user_info(response):
+    """从登录响应中提取 stayUserId 和 stayToken。"""
+    if not isinstance(response, dict):
+        return None
+
+    data = response.get("data") if isinstance(response.get("data"), dict) else response
+    stay_user_id = data.get("stayUserId")
+    stay_token = data.get("stayToken")
+    if stay_user_id and stay_token:
+        return {
+            "stayUserId": str(stay_user_id),
+            "stayToken": str(stay_token),
+        }
+    return None
+
+
+def store_login_credentials(phone_number, login_info):
+    """存储登录凭证，保证 stayUserId 与 stayToken 一一对应。"""
+    if not login_info:
+        return
+
+    user_id = login_info["stayUserId"]
+    token = login_info["stayToken"]
+
+    existing = LOGIN_CREDENTIALS.get(user_id)
+    if existing and existing["stayToken"] != token:
+        raise AssertionError(
+            f"用户ID {user_id} 已存在不同 token：{existing['stayToken']} vs {token}"
+        )
+
+    LOGIN_CREDENTIALS[user_id] = {
+        "phone_number": phone_number,
+        "stayUserId": user_id,
+        "stayToken": token,
+    }
+
+
+def get_login_credentials_by_user_id(stay_user_id):
+    return LOGIN_CREDENTIALS.get(str(stay_user_id))
+
+
+def get_login_credentials_by_phone(phone_number):
+    for value in LOGIN_CREDENTIALS.values():
+        if value["phone_number"] == phone_number:
+            return value
+    return None
+
+
 def test_create_login_phone_params_contains_required_fields():
     payload = create_login_phone_params(
         phone_number="13800138000",
@@ -163,8 +214,14 @@ def test_login_phone_api(request, encrypt_key, phone_number):
 
     login_success = _is_login_success(response)
 
+    login_info = extract_login_user_info(response)
+    if login_info:
+        store_login_credentials(phone_number, login_info)
+    
     print(f"[login_phone] phone={phone_number}, 响应: {response}")
     print(f"[login_phone] phone={phone_number}, 登录结果: success={login_success}")
+    if login_info:
+        print(f"[login_phone] phone={phone_number}, stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
 
     if not login_success:
         error_message = (
@@ -179,6 +236,9 @@ def test_login_phone_api(request, encrypt_key, phone_number):
             f"登录失败: phone={phone_number}, code={response.get('code')}, "
             f"stayCode={response.get('stayCode')}, message={error_message}, response={response}"
         )
+
+    # 避免接口请求过于频繁，等待2秒
+    time.sleep(2)
 
 
 def _build_debug_payload():
