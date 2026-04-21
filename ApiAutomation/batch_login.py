@@ -227,6 +227,7 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
         
         last_failure = {
             "phone": phone_number,
+            "unique_id": unique_id,
             "ok": False,
             "stage": "login",
             "response": login_response,
@@ -336,9 +337,9 @@ def main():
         print(f"登录凭证已保存到: {credentials_file}")
     
     if failures:
-        print("失败手机号列表:")
+        print("失败手机号列表 (手机号 - 设备ID):")
         for fail in failures:
-            print(f"  {fail['phone']} stage={fail['stage']}")
+            print(f"  {fail['phone']} - {fail.get('unique_id', '未知设备ID')} stage={fail['stage']}")
 
 
 # 多线程批量登录 python batch_login.py --workers 10 --delay 0.5 --save-credentials
