@@ -305,7 +305,8 @@ def build_business_headers_from_login(phone_number=None, stay_user_id=None):
         )
 
     headers = settings.build_common_encrypted_headers()
-    headers["Authorization"] = f"Bearer {credential['stayToken']}"
+    # 根据API文档示例，token应该直接放在'token'字段中，而不是'Authorization: Bearer'
+    headers["token"] = credential['stayToken']
     return headers, credential
 
 
