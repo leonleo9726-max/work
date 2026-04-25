@@ -319,7 +319,7 @@ if __name__ == "__main__":
     
     if not args.run_api:
         print("警告: 需要 --run-api 参数才会执行真实API测试")
-        print("示例: python test_red_packet.py --run-api --phone 15200711073 --amount 20000 --count 1 --condition 2 --distribute-type 1")
+        print("示例: python tests/test_red_packet.py --run-api --phone 15200711073 --amount 20000 --count 1 --condition 2 --distribute-type 1")
         sys.exit(0)
     
     success = _send_red_packet_direct(
@@ -336,5 +336,3 @@ if __name__ == "__main__":
     else:
         print("[直接运行] 测试失败")
         sys.exit(1)
-
-# python tests/test_red_packet.py --run-api --phone 15200711071 --amount 20000 --count 1

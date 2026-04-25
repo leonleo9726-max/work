@@ -25,6 +25,18 @@ DEL user:info:15857 user:info:15860 user:info:15852
 python tests/test_login_phone.py --run-api --phone 15200711073 --code 8888 --area 86 --password a123456
 
 
+
+# 发金币红包并抢红包
+pytest tests/test_receive_red_packet.py -k "coin" --run-api -s
+
+# 发礼物红包并抢红包
+pytest tests/test_receive_red_packet.py -k "gift" --run-api -s
+
+# 运行所有抢红包测试
+pytest tests/test_receive_red_packet.py --run-api -s
+
+
+
 ## 使用建议
 
 ### 保守模式 (最高成功率)
