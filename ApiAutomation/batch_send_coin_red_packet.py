@@ -15,6 +15,7 @@ from config import settings
 
 
 SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
+RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
 
 
 def load_login_credentials():
@@ -101,8 +102,35 @@ def get_error_details(response):
     return str(response)
 
 
-def execute_send_coin_red_packet(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
-    """执行单个金币红包发送任务"""
+def extract_stay_red_packet_id(response):
+    """从发红包接口的响应中提取 stayRedPacketId"""
+    if not isinstance(response, dict):
+        return None
+    
+    # 尝试从 stayResult 中提取
+    stay_result = response.get("stayResult")
+    if isinstance(stay_result, dict):
+        red_packet_id = stay_result.get("stayRedPacketId")
+        if red_packet_id is not None:
+            return red_packet_id
+    
+    # 尝试从 data 中提取
+    data = response.get("data")
+    if isinstance(data, dict):
+        red_packet_id = data.get("stayRedPacketId")
+        if red_packet_id is not None:
+            return red_packet_id
+    
+    # 尝试从响应顶层提取
+    red_packet_id = response.get("stayRedPacketId")
+    if red_packet_id is not None:
+        return red_packet_id
+    
+    return None
+
+
+def execute_send_coin_only(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
+    """仅发送金币红包（向后兼容模式）"""
     stay_user_id = credential["stayUserId"]
     phone_number = credential["phone_number"]
     stay_token = credential["stayToken"]
@@ -110,7 +138,6 @@ def execute_send_coin_red_packet(credential, amount, count, condition, distribut
     last_failure = None
     for attempt in range(1, retry + 1):
         if delay and delay > 0:
-            # 添加随机抖动，避免请求过于规律
             actual_delay = delay * (1 + random.uniform(-jitter, jitter))
             time.sleep(max(0.1, actual_delay))
 
@@ -162,7 +189,124 @@ def execute_send_coin_red_packet(credential, amount, count, condition, distribut
         }
         
         if attempt < retry:
-            # 重试前等待
+            actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
+            time.sleep(max(0.5, actual_retry_delay))
+
+    return last_failure
+
+
+def execute_send_coin_and_receive(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
+    """执行单个金币红包发送 + 自动抢红包的串联任务"""
+    stay_user_id = credential["stayUserId"]
+    phone_number = credential["phone_number"]
+    stay_token = credential["stayToken"]
+    
+    last_failure = None
+    for attempt in range(1, retry + 1):
+        if delay and delay > 0:
+            actual_delay = delay * (1 + random.uniform(-jitter, jitter))
+            time.sleep(max(0.1, actual_delay))
+
+        if verbose and attempt > 1:
+            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+
+        # ===== 步骤1: 发送金币红包 =====
+        headers = build_business_headers(stay_token)
+        send_url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
+        send_payload = {
+            "roomId": stay_user_id,
+            "totalAmount": amount,
+            "totalCount": count,
+            "claimCondition": condition,
+            "distributeType": distribute_type,
+        }
+
+        send_response = HttpUtils.post(
+            url=send_url,
+            data=send_payload,
+            headers=headers,
+            encrypt_key=settings.TEST_ENCRYPT_KEY,
+            locale="en",
+            timestamp=str(int(time.time() * 1000)),
+        )
+
+        if not is_success(send_response):
+            error_details = get_error_details(send_response)
+            last_failure = {
+                "phone": phone_number,
+                "stayUserId": stay_user_id,
+                "ok": False,
+                "stage": "send_coin_red_packet",
+                "response": send_response,
+                "error_details": error_details,
+                "attempt": attempt
+            }
+            if attempt < retry:
+                actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
+                time.sleep(max(0.5, actual_retry_delay))
+            continue
+
+        # ===== 步骤2: 从发红包响应中提取 stayRedPacketId =====
+        red_packet_id = extract_stay_red_packet_id(send_response)
+        if red_packet_id is None:
+            last_failure = {
+                "phone": phone_number,
+                "stayUserId": stay_user_id,
+                "ok": False,
+                "stage": "extract_red_packet_id",
+                "response": send_response,
+                "error_details": "发红包响应中未找到 stayRedPacketId",
+                "attempt": attempt
+            }
+            if attempt < retry:
+                actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
+                time.sleep(max(0.5, actual_retry_delay))
+            continue
+
+        if verbose:
+            print(f"[SEND_OK] {phone_number} (ID: {stay_user_id}) - 金币红包发送成功, stayRedPacketId={red_packet_id}")
+
+        # ===== 步骤3: 使用提取到的 red_packet_id 抢红包 =====
+        receive_url = f"{settings.BASE_URL}{RECEIVE_RED_PACKET_PATH}"
+        receive_payload = {
+            "redPacketId": red_packet_id
+        }
+
+        receive_response = HttpUtils.post(
+            url=receive_url,
+            data=receive_payload,
+            headers=headers,
+            encrypt_key=settings.TEST_ENCRYPT_KEY,
+            locale="en",
+            timestamp=str(int(time.time() * 1000)),
+        )
+
+        if is_success(receive_response):
+            if verbose:
+                print(f"[OK] {phone_number} (ID: {stay_user_id}) - 发金币红包并抢红包成功, red_packet_id={red_packet_id}")
+            return {
+                "phone": phone_number,
+                "stayUserId": stay_user_id,
+                "ok": True,
+                "red_packet_id": red_packet_id,
+                "send_response": send_response,
+                "receive_response": receive_response
+            }
+
+        # 抢红包失败
+        error_details = get_error_details(receive_response)
+        last_failure = {
+            "phone": phone_number,
+            "stayUserId": stay_user_id,
+            "ok": False,
+            "stage": "receive_red_packet",
+            "red_packet_id": red_packet_id,
+            "response": receive_response,
+            "error_details": error_details,
+            "attempt": attempt
+        }
+        
+        if attempt < retry:
             actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
             time.sleep(max(0.5, actual_retry_delay))
 
@@ -170,7 +314,7 @@ def execute_send_coin_red_packet(credential, amount, count, condition, distribut
 
 
 def main():
-    parser = argparse.ArgumentParser(description="多线程批量发送金币红包")
+    parser = argparse.ArgumentParser(description="多线程批量发送金币红包并自动抢红包（串联模式）")
     parser.add_argument("--workers", type=int, default=3, help="并发线程数，默认3")
     parser.add_argument("--delay", type=float, default=1.0, help="每个任务开始前等待秒数，默认1.0")
     parser.add_argument("--retry", type=int, default=2, help="每个用户最大重试次数，默认2")
@@ -186,6 +330,9 @@ def main():
     parser.add_argument("--condition", type=int, default=2, choices=[1, 2], help="领取条件：1-拼手气，2-普通，默认2")
     parser.add_argument("--distribute-type", type=int, default=1, choices=[1, 2], help="分发类型：1-即时，2-定时，默认1")
     
+    # 抢红包控制
+    parser.add_argument("--skip-receive", action="store_true", help="跳过抢红包步骤，仅发送红包（向后兼容）")
+    
     args = parser.parse_args()
 
     # 加载登录凭证
@@ -200,7 +347,13 @@ def main():
         print("没有找到可用的登录凭证，请检查 data/login_credentials.json")
         return
 
-    print(f"开始批量发送金币红包: total={total}, workers={args.workers}, delay={args.delay}")
+    if args.skip_receive:
+        print(f"开始批量发送金币红包（仅发送，跳过抢红包）: total={total}, workers={args.workers}, delay={args.delay}")
+        task_func = execute_send_coin_only
+    else:
+        print(f"开始批量发送金币红包并自动抢红包（串联模式）: total={total}, workers={args.workers}, delay={args.delay}")
+        task_func = execute_send_coin_and_receive
+    
     print(f"红包参数: amount={args.amount}, count={args.count}, condition={args.condition}, distribute-type={args.distribute_type}")
 
     success_count = 0
@@ -210,7 +363,7 @@ def main():
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_to_cred = {
             executor.submit(
-                execute_send_coin_red_packet,
+                task_func,
                 cred,
                 args.amount,
                 args.count,
@@ -224,6 +377,7 @@ def main():
             ): cred
             for cred in credentials
         }
+        
         for future in as_completed(future_to_cred):
             result = future.result()
             if result["ok"]:
@@ -240,16 +394,15 @@ def main():
     print(f"总耗时: {elapsed:.1f}s")
     
     if failures:
-        print("失败用户列表 (手机号 - 用户ID):")
+        print("失败用户列表 (手机号 - 用户ID - 阶段):")
         for fail in failures:
             print(f"  {fail['phone']} - {fail['stayUserId']} stage={fail['stage']}")
 
 
-# 多线程批量发送金币红包 python batch_send_coin_red_packet.py --workers 5 --delay 0.5 --amount 20000 --count 1
-# --workers 5：使用 5 个线程并发执行
-# --delay 0.5：每个任务启动前等待 0.5 秒，避免请求过于密集
-# --amount 20000：红包总金额 20000 分（即 200 元）
-# --count 1：红包个数为 1
+# 串联模式（发金币红包 + 自动抢红包）:
+#   python batch_send_coin_red_packet.py --workers 5 --delay 0.5 --amount 20000 --count 1
+# 仅发送模式（向后兼容）:
+#   python batch_send_coin_red_packet.py --workers 5 --delay 0.5 --amount 20000 --count 1 --skip-receive
 
 if __name__ == "__main__":
     main()

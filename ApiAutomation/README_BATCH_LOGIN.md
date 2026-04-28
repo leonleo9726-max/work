@@ -36,6 +36,16 @@ pytest tests/test_receive_red_packet.py -k "gift" --run-api -s
 pytest tests/test_receive_red_packet.py --run-api -s
 
 
+# 直接抢
+python batch_receive_red_packet.py --red-packet-id 123 --workers 10 --delay 0.05
+
+# 金币串联
+python batch_receive_red_packet.py --send-coin --workers 5 --delay 0.5 --amount 20000 --count 1
+
+# 礼物串联
+python batch_receive_red_packet.py --send-gift --workers 5 --delay 0.5 --gift-id 107 --gift-count 7 --total-amount 266 --total-count 5
+
+
 
 ## 使用建议
 

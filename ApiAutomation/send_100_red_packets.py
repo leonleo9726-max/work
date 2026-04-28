@@ -135,7 +135,7 @@ def main():
     failure_count = 0
     start_time = time.time()
     
-    for i in range(1, 101):
+    for i in range(1, 31):
         try:
             success = send_single_red_packet(
                 credential, 
