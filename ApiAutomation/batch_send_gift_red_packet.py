@@ -20,7 +20,7 @@ RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
 
 def load_login_credentials():
     """从JSON文件加载登录凭证"""
-    credentials_file = PROJECT_ROOT / "data" / "login_credentials.json"
+    credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
     if not credentials_file.exists():
         print(f"错误: 登录凭证文件不存在: {credentials_file}")
         print("请先运行 batch_login.py --save-credentials 生成登录凭证")
@@ -31,10 +31,10 @@ def load_login_credentials():
     
     # 转换为列表，每个元素包含手机号和凭证信息
     credential_list = []
-    for stay_user_id, cred in credentials.items():
+    for phone_number, cred in credentials.items():
         credential_list.append({
-            "stayUserId": stay_user_id,
-            "phone_number": cred.get("phone_number", ""),
+            "stayUserId": cred.get("stayUserId", ""),
+            "phone_number": cred.get("phone_number", phone_number),
             "stayToken": cred.get("stayToken", ""),
             "uniqueId": cred.get("uniqueId", "")
         })
@@ -129,11 +129,14 @@ def extract_stay_red_packet_id(response):
     return None
 
 
-def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amount, total_count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
+def execute_send_gift_only(credential, gift_id, gift_count, total_amount, total_count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3, room_id=None):
     """仅发送礼物红包（向后兼容模式）"""
     stay_user_id = credential["stayUserId"]
     phone_number = credential["phone_number"]
     stay_token = credential["stayToken"]
+    
+    # 如果未指定 room_id，则使用 stayUserId 作为默认值
+    actual_room_id = room_id if room_id is not None else stay_user_id
     
     last_failure = None
     for attempt in range(1, retry + 1):
@@ -147,9 +150,6 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
         # 构建请求
         headers = build_business_headers(stay_token)
         url = f"{settings.BASE_URL}{SEND_GIFT_RED_PACKET_PATH}"
-        
-        # 如果room_id为None，使用登录用户的ID作为roomId
-        actual_room_id = room_id if room_id is not None else stay_user_id
         
         payload = {
             "roomId": actual_room_id,
@@ -201,11 +201,14 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
     return last_failure
 
 
-def execute_send_gift_and_receive(credential, room_id, gift_id, gift_count, total_amount, total_count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
+def execute_send_gift_and_receive(credential, gift_id, gift_count, total_amount, total_count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3, room_id=None):
     """执行单个礼物红包发送 + 自动抢红包的串联任务"""
     stay_user_id = credential["stayUserId"]
     phone_number = credential["phone_number"]
     stay_token = credential["stayToken"]
+    
+    # 如果未指定 room_id，则使用 stayUserId 作为默认值
+    actual_room_id = room_id if room_id is not None else stay_user_id
     
     last_failure = None
     for attempt in range(1, retry + 1):
@@ -219,8 +222,6 @@ def execute_send_gift_and_receive(credential, room_id, gift_id, gift_count, tota
         # ===== 步骤1: 发送礼物红包 =====
         headers = build_business_headers(stay_token)
         send_url = f"{settings.BASE_URL}{SEND_GIFT_RED_PACKET_PATH}"
-        
-        actual_room_id = room_id if room_id is not None else stay_user_id
         
         send_payload = {
             "roomId": actual_room_id,
@@ -358,7 +359,7 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        print("没有找到可用的登录凭证，请检查 data/login_credentials.json")
+        print("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
         return
 
     if args.skip_receive:
@@ -380,7 +381,6 @@ def main():
             executor.submit(
                 task_func,
                 cred,
-                args.room_id,
                 args.gift_id,
                 args.gift_count,
                 args.total_amount,
@@ -392,6 +392,7 @@ def main():
                 args.retry,
                 args.retry_delay,
                 args.jitter,
+                args.room_id,
             ): cred
             for cred in credentials
         }
