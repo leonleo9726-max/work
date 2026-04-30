@@ -1,5 +1,12 @@
+"""
+批量登录脚本（多线程 + 连接池）。
+
+使用 ThreadPoolExecutor 并发执行登录，通过 HttpUtils 连接池复用 HTTP 连接。
+"""
+
 import argparse
 import csv
+import logging
 import random
 import sys
 import time
@@ -13,6 +20,19 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from common.http_utils import HttpUtils
 from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(verbose: bool = False):
+    """配置日志输出"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
+    )
 
 
 def load_csv_values(data_file: Path, field_name: str):
@@ -198,7 +218,7 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number}")
+            logger.info("[RETRY %s/%s] %s", attempt, retry, phone_number)
 
         login_payload = create_login_params(phone_number, unique_id)
         login_response = HttpUtils.post(
@@ -212,9 +232,9 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
             login_info = extract_login_info(login_response)
             if verbose:
                 if login_info:
-                    print(f"[OK] {phone_number} - stayUserId={login_info['stayUserId']}")
+                    logger.info("[OK] %s - stayUserId=%s", phone_number, login_info['stayUserId'])
                 else:
-                    print(f"[OK] {phone_number}")
+                    logger.info("[OK] %s", phone_number)
             return {
                 "phone": phone_number,
                 "ok": True,
@@ -243,7 +263,7 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
             if stay_code == 980003000 and "100087" in str(error_msg):
                 is_network_error = True
                 if verbose:
-                    print(f"  [网络错误 100087] 将在重试前等待更长时间")
+                    logger.warning("[网络错误 100087] %s 将在重试前等待更长时间", phone_number)
         
         if attempt < retry:
             # 如果是网络错误，增加重试延迟
@@ -267,6 +287,9 @@ def main():
     parser.add_argument("--save-credentials", action="store_true", help="是否保存登录凭证到JSON文件")
     args = parser.parse_args()
 
+    # 配置日志
+    configure_logging(args.verbose)
+
     # 加载手机号和设备ID
     phones = load_csv_values(PROJECT_ROOT / "data" / "login_phone.csv", "phone_number")
     unique_ids = load_csv_values(PROJECT_ROOT / "data" / "device_ids.csv", "uniqueId")
@@ -279,10 +302,10 @@ def main():
     test_cases = allocate_unique_ids(phones, unique_ids)
     total = len(test_cases)
     if total == 0:
-        print("没有找到可登录的手机号，请检查 data/login_phone.csv")
+        logger.error("没有找到可登录的手机号，请检查 data/login_phone.csv")
         return
 
-    print(f"开始批量登录: total={total}, workers={args.workers}, delay={args.delay}")
+    logger.info("开始批量登录: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
 
     success_count = 0
     failures = []
@@ -320,13 +343,14 @@ def main():
             else:
                 failures.append(result)
                 error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                print(f"[FAILED] {result['phone']} stage={result['stage']} attempt={result.get('attempt', 1)}")
-                print(f"        错误: {error_msg[:100]}...")
+                logger.warning("[FAILED] %s stage=%s attempt=%s", result['phone'], result['stage'], result.get('attempt', 1))
+                logger.debug("        错误: %s", error_msg[:100])
 
     elapsed = time.time() - start_time
-    print("\n批量登录完成")
-    print(f"成功: {success_count}/{total}, 失败: {len(failures)}")
-    print(f"总耗时: {elapsed:.1f}s")
+    logger.info("批量登录完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
+    
+    # 清理当前线程的 Session 连接
+    HttpUtils.close_session()
     
     # 保存登录凭证
     if args.save_credentials and login_credentials:
@@ -334,12 +358,12 @@ def main():
         credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
         with credentials_file.open("w", encoding="utf-8") as f:
             json.dump(login_credentials, f, ensure_ascii=False, indent=2)
-        print(f"登录凭证已保存到: {credentials_file}")
+        logger.info("登录凭证已保存到: %s", credentials_file)
     
     if failures:
-        print("失败手机号列表 (手机号 - 设备ID):")
+        logger.warning("失败手机号列表 (手机号 - 设备ID):")
         for fail in failures:
-            print(f"  {fail['phone']} - {fail.get('unique_id', '未知设备ID')} stage={fail['stage']}")
+            logger.warning("  %s - %s stage=%s", fail['phone'], fail.get('unique_id', '未知设备ID'), fail['stage'])
 
 
 # 多线程批量登录 python batch_login.py --workers 10 --delay 0.5 --save-credentials

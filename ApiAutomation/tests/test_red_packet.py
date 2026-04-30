@@ -1,19 +1,25 @@
-import time
-import sys
-from pathlib import Path
+"""
+发送金币红包测试模块。
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+支持 pytest 参数化测试和直接运行模式。
+"""
+
+import argparse
+import logging
+import sys
+import time
+from pathlib import Path
 
 import pytest
 
+# conftest.py 已处理 sys.path
+from common.api_paths import SEND_COIN_RED_PACKET_PATH
+from common.auth_utils import build_business_headers_from_login, ensure_login_credentials
 from common.http_utils import HttpUtils
+from common.response_utils import extract_error_message, is_api_success
 from config import settings
-from tests.test_login_phone import build_business_headers_from_login
 
-
-SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.api
@@ -25,34 +31,6 @@ SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
     ],
     ids=["default_red_packet", "custom_red_packet"],
 )
-def send_red_packet(headers, credential, payload):
-    """发送红包的辅助函数"""
-    url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
-    
-    print(f"[send_red_packet] 发送请求到: {url}")
-    print(f"[send_red_packet] 请求头: {headers}")
-    print(f"[send_red_packet] 请求参数: {payload}")
-    
-    response = HttpUtils.post(
-        url=url,
-        data=payload,
-        headers=headers,
-        encrypt_key=settings.TEST_ENCRYPT_KEY,
-        locale="en",
-        timestamp=str(int(time.time() * 1000)),
-    )
-    
-    print(f"[send_red_packet] 完整响应: {response}")
-    
-    if response is None:
-        raise AssertionError("发送金币红包接口未返回有效响应")
-    
-    if not isinstance(response, dict):
-        raise AssertionError("发送金币红包接口返回值应为 JSON 对象")
-    
-    return response
-
-
 def test_send_coin_red_packet(request, phone_number, total_amount, total_count, claim_condition, distribute_type):
     """发送金币红包接口测试，从 login_credentials.json 读取登录凭证。"""
     if not request.config.getoption("--run-api"):
@@ -62,40 +40,42 @@ def test_send_coin_red_packet(request, phone_number, total_amount, total_count, 
     assert credential["stayToken"], "读取到的 stayToken 不能为空"
     assert credential["stayUserId"], "读取到的 stayUserId 不能为空"
 
-    # 记录请求头中的 token
     token = credential["stayToken"]
-    print(f"[send_coin_red_packet] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
+    url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
     payload = {
-        "roomId": credential["stayUserId"],  # 使用登录的 userid 作为 roomId
+        "roomId": credential["stayUserId"],
         "totalAmount": total_amount,
         "totalCount": total_count,
         "claimCondition": claim_condition,
         "distributeType": distribute_type,
     }
 
-    # 发送红包并获取完整响应
-    response = send_red_packet(headers, credential, payload)
+    logger.info(f"发送请求到: {url}")
+    logger.info(f"请求参数: {payload}")
 
-    # 检查响应是否成功
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
+    response = HttpUtils.post(
+        url=url,
+        data=payload,
+        headers=headers,
+        encrypt_key=settings.TEST_ENCRYPT_KEY,
+        locale="en",
+        timestamp=str(int(time.time() * 1000)),
     )
 
-    if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+    logger.info(f"完整响应: {response}")
+
+    if response is None:
+        raise AssertionError("发送金币红包接口未返回有效响应")
+    if not isinstance(response, dict):
+        raise AssertionError("发送金币红包接口返回值应为 JSON 对象")
+
+    if not is_api_success(response):
+        error_message = extract_error_message(response)
         pytest.fail(f"发送金币红包失败: {error_message}, 完整响应: {response}")
 
-    print(f"[send_coin_red_packet] 用户 {credential['stayUserId']} 发送红包成功，参数: {payload}，响应: {response}")
+    logger.info(f"用户 {credential['stayUserId']} 发送红包成功，参数: {payload}，响应: {response}")
 
 
 @pytest.mark.api
@@ -105,15 +85,12 @@ def test_login_then_send_red_packet(request, encrypt_key):
         pytest.skip("need --run-api option to execute real API tests")
 
     phone_number = "15200711073"
-    from tests.test_login_phone import ensure_login_credentials
-
     credential = ensure_login_credentials(phone_number, encrypt_key)
     assert credential["stayToken"], "登录后读取到的 stayToken 不能为空"
     assert credential["stayUserId"], "登录后读取到的 stayUserId 不能为空"
 
-    # 记录请求头中的 token
     token = credential["stayToken"]
-    print(f"[login_then_send] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
     url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
     payload = {
@@ -124,10 +101,9 @@ def test_login_then_send_red_packet(request, encrypt_key):
         "distributeType": 1,
     }
 
-    # 构建正确的headers，使用token字段而不是Authorization
-    headers = settings.build_common_encrypted_headers()
-    headers["token"] = credential['stayToken']
-    
+    from common.auth_utils import build_business_headers
+    headers = build_business_headers(credential['stayToken'])
+
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -140,23 +116,11 @@ def test_login_then_send_red_packet(request, encrypt_key):
     assert response is not None, "发送金币红包接口未返回有效响应"
     assert isinstance(response, dict), "发送金币红包接口返回值应为 JSON 对象"
 
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-    if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+    if not is_api_success(response):
+        error_message = extract_error_message(response)
         pytest.fail(f"登录并发送红包失败: {error_message}, 响应: {response}")
 
-    print(f"[login_then_send] 用户 {credential['stayUserId']} 登录并发送红包成功，响应: {response}")
+    logger.info(f"用户 {credential['stayUserId']} 登录并发送红包成功，响应: {response}")
 
 
 @pytest.mark.api
@@ -174,9 +138,8 @@ def test_batch_send_red_packets(request):
             assert credential["stayToken"], f"用户 {phone} 的 stayToken 不能为空"
             assert credential["stayUserId"], f"用户 {phone} 的 stayUserId 不能为空"
 
-            # 记录请求头中的 token
             token = credential["stayToken"]
-            print(f"[batch_red_packet] 用户 {phone} (ID: {credential['stayUserId']}) 的 token: {token[:20]}... (长度: {len(token)})")
+            logger.info(f"用户 {phone} (ID: {credential['stayUserId']}) 的 token: {token[:20]}... (长度: {len(token)})")
 
             url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
             payload = {
@@ -199,76 +162,54 @@ def test_batch_send_red_packets(request):
             assert response is not None, f"用户 {phone} 发送金币红包接口未返回有效响应"
             assert isinstance(response, dict), f"用户 {phone} 发送金币红包接口返回值应为 JSON 对象"
 
-            success = (
-                response.get("code") == 0
-                or response.get("stayCode") == 200
-                or response.get("stayIsSuccess") is True
-                or response.get("success") is True
-                or response.get("status") == "success"
-            )
-
-            if success:
+            if is_api_success(response):
                 results[phone] = {"success": True, "response": response}
-                print(f"[batch_red_packet] {phone} 发送成功: {response}")
+                logger.info(f"{phone} 发送成功: {response}")
             else:
-                error_message = (
-                    response.get("message")
-                    or response.get("errorMessage")
-                    or response.get("msg")
-                    or "未知错误"
-                )
+                error_message = extract_error_message(response)
                 results[phone] = {"success": False, "error": error_message}
-                print(f"[batch_red_packet] {phone} 发送失败: {error_message}")
+                logger.info(f"{phone} 发送失败: {error_message}")
 
         except Exception as e:
             results[phone] = {"success": False, "error": str(e)}
-            print(f"[batch_red_packet] {phone} 发送异常: {e}")
+            logger.error(f"{phone} 发送异常: {e}")
 
-        time.sleep(1)  # 避免请求过于频繁
+        time.sleep(1)
 
-    # 至少有一个成功
     successful_sends = sum(1 for result in results.values() if result["success"])
     assert successful_sends > 0, f"批量发送失败，所有结果: {results}"
 
 
 def parse_args():
     """解析命令行参数"""
-    import argparse
     parser = argparse.ArgumentParser(description="发送金币红包测试")
     parser.add_argument("--phone", type=str, default="15200711073",
-                       help="手机号码，默认: 15200711073")
+                        help="手机号码，默认: 15200711073")
     parser.add_argument("--amount", type=int, default=20000,
-                       help="红包总金额（单位：分），默认: 20000")
+                        help="红包总金额（单位：分），默认: 20000")
     parser.add_argument("--count", type=int, default=1,
-                       help="红包个数，默认: 1")
+                        help="红包个数，默认: 1")
     parser.add_argument("--condition", type=int, default=2, choices=[1, 2],
-                       help="领取条件：1-拼手气，2-普通，默认: 2")
+                        help="领取条件：1-拼手气，2-普通，默认: 2")
     parser.add_argument("--distribute-type", type=int, default=1, choices=[1, 2],
-                       help="分发类型：1-即时，2-定时，默认: 1")
+                        help="分发类型：1-即时，2-定时，默认: 1")
     parser.add_argument("--run-api", action="store_true",
-                       help="执行真实API测试（需要此参数才会调用接口）")
+                        help="执行真实API测试（需要此参数才会调用接口）")
     parser.add_argument("--verbose", action="store_true",
-                       help="打印详细日志")
+                        help="打印详细日志")
     return parser.parse_args()
 
 
 def _send_red_packet_direct(phone_number, total_amount, total_count, claim_condition, distribute_type):
     """直接运行模式下的红包发送函数"""
-    import sys
-    from tests.test_login_phone import build_business_headers_from_login
-    from config import settings
-    from common.http_utils import HttpUtils
-    
-    # 获取登录凭证
     headers, credential = build_business_headers_from_login(phone_number=phone_number)
     if not credential.get("stayToken") or not credential.get("stayUserId"):
         print(f"错误: 用户 {phone_number} 登录凭证无效")
         sys.exit(1)
-    
-    # 记录请求头中的 token
+
     token = credential["stayToken"]
     print(f"[直接运行] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
-    
+
     url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
     payload = {
         "roomId": credential["stayUserId"],
@@ -277,11 +218,10 @@ def _send_red_packet_direct(phone_number, total_amount, total_count, claim_condi
         "claimCondition": claim_condition,
         "distributeType": distribute_type,
     }
-    
+
     print(f"[直接运行] 发送红包参数: {payload}")
     print(f"[直接运行] 请求URL: {url}")
-    
-    # 发送请求
+
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -290,24 +230,13 @@ def _send_red_packet_direct(phone_number, total_amount, total_count, claim_condi
         locale="en",
         timestamp=str(int(time.time() * 1000)),
     )
-    
-    print(f"[直接运行] 完整响应: {response}")
-    
 
-    
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-    
-    if success:
+    print(f"[直接运行] 完整响应: {response}")
+
+    if is_api_success(response):
         print(f"[直接运行] 红包发送成功")
         return True
     else:
-        # 不打印详细错误信息，只返回False
         return False
 
 
@@ -316,12 +245,12 @@ if __name__ == "__main__":
     print(f"[命令行参数] phone={args.phone}, amount={args.amount}, count={args.count}, "
           f"condition={args.condition}, distribute-type={args.distribute_type}, "
           f"run-api={args.run_api}, verbose={args.verbose}")
-    
+
     if not args.run_api:
         print("警告: 需要 --run-api 参数才会执行真实API测试")
         print("示例: python tests/test_red_packet.py --run-api --phone 15200711073 --amount 20000 --count 1 --condition 2 --distribute-type 1")
         sys.exit(0)
-    
+
     success = _send_red_packet_direct(
         phone_number=args.phone,
         total_amount=args.amount,
@@ -329,7 +258,7 @@ if __name__ == "__main__":
         claim_condition=args.condition,
         distribute_type=args.distribute_type,
     )
-    
+
     if success:
         print("[直接运行] 测试通过")
         sys.exit(0)

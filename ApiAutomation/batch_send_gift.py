@@ -1,5 +1,12 @@
+"""
+批量发送礼物脚本（多线程 + 连接池）。
+
+使用 ThreadPoolExecutor 并发发送礼物，通过 HttpUtils 连接池复用 HTTP 连接。
+"""
+
 import argparse
 import json
+import logging
 import random
 import sys
 import time
@@ -13,6 +20,19 @@ if str(PROJECT_ROOT) not in sys.path:
 from common.http_utils import HttpUtils
 from config import settings
 
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(verbose: bool = False):
+    """配置日志输出"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
+    )
+
 
 BATCH_SEND_GIFT_PATH = "/live/stay/gift/batch-send"
 
@@ -21,8 +41,8 @@ def load_login_credentials():
     """从 batch_login_credentials.json 加载登录凭证"""
     credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
     if not credentials_file.exists():
-        print(f"错误: 登录凭证文件不存在: {credentials_file}")
-        print("请先运行 batch_login.py --save-credentials 生成登录凭证")
+        logger.error("错误: 登录凭证文件不存在: %s", credentials_file)
+        logger.error("请先运行 batch_login.py --save-credentials 生成登录凭证")
         sys.exit(1)
 
     with credentials_file.open("r", encoding="utf-8") as f:
@@ -115,7 +135,7 @@ def execute_send_gift(credential, recipients, gift_id, count, source_type, objec
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+            logger.info("[RETRY %s/%s] %s (ID: %s)", attempt, retry, phone_number, stay_user_id)
 
         # 构建请求
         headers = build_business_headers(stay_token)
@@ -158,7 +178,7 @@ def execute_send_gift(credential, recipients, gift_id, count, source_type, objec
 
         if is_success(response):
             if verbose:
-                print(f"[OK] {phone_number} (ID: {stay_user_id}) - 礼物发送成功")
+                logger.info("[OK] %s (ID: %s) - 礼物发送成功", phone_number, stay_user_id)
             return {
                 "phone": phone_number,
                 "stayUserId": stay_user_id,
@@ -211,6 +231,9 @@ def main():
 
     args = parser.parse_args()
 
+    # 配置日志
+    configure_logging(args.verbose)
+
     # 加载登录凭证
     credentials = load_login_credentials()
     if args.max_count > 0:
@@ -220,12 +243,12 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        print("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
+        logger.error("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
         return
 
-    print(f"开始批量发送礼物: total={total}, workers={args.workers}, delay={args.delay}")
-    print(f"礼物参数: recipients={args.recipients}, gift_id={args.gift_id}, count={args.count}, "
-          f"source_type={args.source_type}, object_id={args.object_id}, room_id={args.room_id}")
+    logger.info("开始批量发送礼物: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
+    logger.info("礼物参数: recipients=%s, gift_id=%s, count=%s, source_type=%s, object_id=%s, room_id=%s",
+                args.recipients, args.gift_id, args.count, args.source_type, args.object_id, args.room_id)
 
     success_count = 0
     failures = []
@@ -258,20 +281,21 @@ def main():
             else:
                 failures.append(result)
                 error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                print(f"[FAILED] {result['phone']} (ID: {result['stayUserId']}) stage={result['stage']} attempt={result.get('attempt', 1)}")
-                print(f"        错误: {error_msg}")
+                logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], result.get('attempt', 1))
+                logger.debug("        错误: %s", error_msg)
                 if args.show_full_response and result.get('response'):
-                    print(f"        完整响应: {json.dumps(result['response'], ensure_ascii=False, indent=2)}")
+                    logger.debug("        完整响应: %s", json.dumps(result['response'], ensure_ascii=False, indent=2))
 
     elapsed = time.time() - start_time
-    print("\n批量发送礼物完成")
-    print(f"成功: {success_count}/{total}, 失败: {len(failures)}")
-    print(f"总耗时: {elapsed:.1f}s")
+    logger.info("批量发送礼物完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
+
+    # 清理当前线程的 Session 连接
+    HttpUtils.close_session()
 
     if failures:
-        print("失败用户列表 (手机号 - 用户ID):")
+        logger.warning("失败用户列表 (手机号 - 用户ID):")
         for fail in failures:
-            print(f"  {fail['phone']} - {fail['stayUserId']}")
+            logger.warning("  %s - %s", fail['phone'], fail['stayUserId'])
 
 
 # 使用示例:

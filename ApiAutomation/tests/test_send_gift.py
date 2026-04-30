@@ -1,47 +1,25 @@
-import time
-import sys
-from pathlib import Path
+"""
+批量发送礼物测试模块。
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+支持 pytest 参数化测试和直接运行模式。
+"""
+
+import argparse
+import logging
+import sys
+import time
+from pathlib import Path
 
 import pytest
 
+# conftest.py 已处理 sys.path
+from common.api_paths import BATCH_SEND_GIFT_PATH
+from common.auth_utils import build_business_headers, build_business_headers_from_login, ensure_login_credentials
 from common.http_utils import HttpUtils
+from common.response_utils import extract_error_message, is_api_success
 from config import settings
-from tests.test_login_phone import build_business_headers_from_login
 
-
-BATCH_SEND_GIFT_PATH = "/live/stay/gift/batch-send"
-
-
-def send_gift(headers, credential, payload):
-    """发送礼物的辅助函数"""
-    url = f"{settings.BASE_URL}{BATCH_SEND_GIFT_PATH}"
-
-    print(f"[send_gift] 发送请求到: {url}")
-    print(f"[send_gift] 请求头: {headers}")
-    print(f"[send_gift] 请求参数: {payload}")
-
-    response = HttpUtils.post(
-        url=url,
-        data=payload,
-        headers=headers,
-        encrypt_key=settings.TEST_ENCRYPT_KEY,
-        locale="en",
-        timestamp=str(int(time.time() * 1000)),
-    )
-
-    print(f"[send_gift] 完整响应: {response}")
-
-    if response is None:
-        raise AssertionError("批量发送礼物接口未返回有效响应")
-
-    if not isinstance(response, dict):
-        raise AssertionError("批量发送礼物接口返回值应为 JSON 对象")
-
-    return response
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.api
@@ -71,10 +49,10 @@ def test_send_gift(
     assert credential["stayToken"], "读取到的 stayToken 不能为空"
     assert credential["stayUserId"], "读取到的 stayUserId 不能为空"
 
-    # 记录请求头中的 token
     token = credential["stayToken"]
-    print(f"[test_send_gift] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
+    url = f"{settings.BASE_URL}{BATCH_SEND_GIFT_PATH}"
     payload = {
         "recipients": recipients,
         "giftId": gift_id,
@@ -84,28 +62,30 @@ def test_send_gift(
         "roomId": room_id,
     }
 
-    # 发送礼物并获取完整响应
-    response = send_gift(headers, credential, payload)
+    logger.info(f"发送请求到: {url}")
+    logger.info(f"请求参数: {payload}")
 
-    # 检查响应是否成功
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
+    response = HttpUtils.post(
+        url=url,
+        data=payload,
+        headers=headers,
+        encrypt_key=settings.TEST_ENCRYPT_KEY,
+        locale="en",
+        timestamp=str(int(time.time() * 1000)),
     )
 
-    if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+    logger.info(f"完整响应: {response}")
+
+    if response is None:
+        raise AssertionError("批量发送礼物接口未返回有效响应")
+    if not isinstance(response, dict):
+        raise AssertionError("批量发送礼物接口返回值应为 JSON 对象")
+
+    if not is_api_success(response):
+        error_message = extract_error_message(response)
         pytest.fail(f"批量发送礼物失败: {error_message}, 完整响应: {response}")
 
-    print(f"[test_send_gift] 用户 {credential['stayUserId']} 发送礼物成功，参数: {payload}，响应: {response}")
+    logger.info(f"用户 {credential['stayUserId']} 发送礼物成功，参数: {payload}，响应: {response}")
 
 
 @pytest.mark.api
@@ -115,15 +95,12 @@ def test_login_then_send_gift(request, encrypt_key):
         pytest.skip("need --run-api option to execute real API tests")
 
     phone_number = "15200711073"
-    from tests.test_login_phone import ensure_login_credentials
-
     credential = ensure_login_credentials(phone_number, encrypt_key)
     assert credential["stayToken"], "登录后读取到的 stayToken 不能为空"
     assert credential["stayUserId"], "登录后读取到的 stayUserId 不能为空"
 
-    # 记录请求头中的 token
     token = credential["stayToken"]
-    print(f"[login_then_send_gift] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
     url = f"{settings.BASE_URL}{BATCH_SEND_GIFT_PATH}"
     payload = {
@@ -135,9 +112,7 @@ def test_login_then_send_gift(request, encrypt_key):
         "roomId": "15712",
     }
 
-    # 构建正确的 headers，使用 token 字段而不是 Authorization
-    headers = settings.build_common_encrypted_headers()
-    headers["token"] = credential['stayToken']
+    headers = build_business_headers(credential['stayToken'])
 
     response = HttpUtils.post(
         url=url,
@@ -151,23 +126,11 @@ def test_login_then_send_gift(request, encrypt_key):
     assert response is not None, "批量发送礼物接口未返回有效响应"
     assert isinstance(response, dict), "批量发送礼物接口返回值应为 JSON 对象"
 
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-    if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+    if not is_api_success(response):
+        error_message = extract_error_message(response)
         pytest.fail(f"登录并发送礼物失败: {error_message}, 响应: {response}")
 
-    print(f"[login_then_send_gift] 用户 {credential['stayUserId']} 登录并发送礼物成功，响应: {response}")
+    logger.info(f"用户 {credential['stayUserId']} 登录并发送礼物成功，响应: {response}")
 
 
 @pytest.mark.api
@@ -185,9 +148,8 @@ def test_batch_send_gifts(request):
             assert credential["stayToken"], f"用户 {phone} 的 stayToken 不能为空"
             assert credential["stayUserId"], f"用户 {phone} 的 stayUserId 不能为空"
 
-            # 记录请求头中的 token
             token = credential["stayToken"]
-            print(f"[batch_send_gift] 用户 {phone} (ID: {credential['stayUserId']}) 的 token: {token[:20]}... (长度: {len(token)})")
+            logger.info(f"用户 {phone} (ID: {credential['stayUserId']}) 的 token: {token[:20]}... (长度: {len(token)})")
 
             url = f"{settings.BASE_URL}{BATCH_SEND_GIFT_PATH}"
             payload = {
@@ -211,41 +173,26 @@ def test_batch_send_gifts(request):
             assert response is not None, f"用户 {phone} 批量发送礼物接口未返回有效响应"
             assert isinstance(response, dict), f"用户 {phone} 批量发送礼物接口返回值应为 JSON 对象"
 
-            success = (
-                response.get("code") == 0
-                or response.get("stayCode") == 200
-                or response.get("stayIsSuccess") is True
-                or response.get("success") is True
-                or response.get("status") == "success"
-            )
-
-            if success:
+            if is_api_success(response):
                 results[phone] = {"success": True, "response": response}
-                print(f"[batch_send_gift] {phone} 发送成功: {response}")
+                logger.info(f"{phone} 发送成功: {response}")
             else:
-                error_message = (
-                    response.get("message")
-                    or response.get("errorMessage")
-                    or response.get("msg")
-                    or "未知错误"
-                )
+                error_message = extract_error_message(response)
                 results[phone] = {"success": False, "error": error_message}
-                print(f"[batch_send_gift] {phone} 发送失败: {error_message}")
+                logger.info(f"{phone} 发送失败: {error_message}")
 
         except Exception as e:
             results[phone] = {"success": False, "error": str(e)}
-            print(f"[batch_send_gift] {phone} 发送异常: {e}")
+            logger.error(f"{phone} 发送异常: {e}")
 
-        time.sleep(1)  # 避免请求过于频繁
+        time.sleep(1)
 
-    # 至少有一个成功
     successful_sends = sum(1 for result in results.values() if result["success"])
     assert successful_sends > 0, f"批量发送失败，所有结果: {results}"
 
 
 def parse_args():
     """解析命令行参数"""
-    import argparse
     parser = argparse.ArgumentParser(description="批量发送礼物测试")
     parser.add_argument("--phone", type=str, default="15200711073",
                         help="手机号码，默认: 15200711073")
@@ -270,18 +217,11 @@ def parse_args():
 
 def _send_gift_direct(phone_number, recipients, gift_id, count, source_type, object_id, room_id):
     """直接运行模式下的礼物发送函数"""
-    import sys
-    from tests.test_login_phone import build_business_headers_from_login
-    from config import settings
-    from common.http_utils import HttpUtils
-
-    # 获取登录凭证
     headers, credential = build_business_headers_from_login(phone_number=phone_number)
     if not credential.get("stayToken") or not credential.get("stayUserId"):
         print(f"错误: 用户 {phone_number} 登录凭证无效")
         sys.exit(1)
 
-    # 记录请求头中的 token
     token = credential["stayToken"]
     print(f"[直接运行] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
@@ -298,7 +238,6 @@ def _send_gift_direct(phone_number, recipients, gift_id, count, source_type, obj
     print(f"[直接运行] 发送礼物参数: {payload}")
     print(f"[直接运行] 请求URL: {url}")
 
-    # 发送请求
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -310,15 +249,7 @@ def _send_gift_direct(phone_number, recipients, gift_id, count, source_type, obj
 
     print(f"[直接运行] 完整响应: {response}")
 
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-
-    if success:
+    if is_api_success(response):
         print(f"[直接运行] 礼物发送成功")
         return True
     else:

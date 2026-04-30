@@ -1,5 +1,17 @@
+"""
+批量抢红包脚本（多线程 + 连接池）。
+
+支持三种模式：
+1. 直接抢红包（指定 red_packet_id）
+2. 先发金币红包再抢（串联模式）
+3. 先发礼物红包再抢（串联模式）
+
+通过 HttpUtils 连接池复用 HTTP 连接。
+"""
+
 import argparse
 import json
+import logging
 import random
 import sys
 import time
@@ -12,6 +24,19 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from common.http_utils import HttpUtils
 from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(verbose: bool = False):
+    """配置日志输出"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
+    )
 
 
 RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
@@ -30,11 +55,11 @@ def load_login_credentials():
     elif single_file.exists():
         credentials_file = single_file
     else:
-        print(f"错误: 登录凭证文件不存在")
-        print(f"  请检查以下文件是否存在:")
-        print(f"    - {batch_file}")
-        print(f"    - {single_file}")
-        print(f"请先运行 batch_login.py --save-credentials 生成登录凭证")
+        logger.error("错误: 登录凭证文件不存在")
+        logger.error("  请检查以下文件是否存在:")
+        logger.error("    - %s", batch_file)
+        logger.error("    - %s", single_file)
+        logger.error("请先运行 batch_login.py --save-credentials 生成登录凭证")
         sys.exit(1)
     
     with credentials_file.open("r", encoding="utf-8") as f:
@@ -185,7 +210,7 @@ def execute_receive_red_packet(credential, red_packet_id, delay, verbose=False, 
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+            logger.info("[RETRY %s/%s] %s (ID: %s)", attempt, retry, phone_number, stay_user_id)
 
         # 构建请求
         headers = build_business_headers(stay_token)
@@ -206,7 +231,7 @@ def execute_receive_red_packet(credential, red_packet_id, delay, verbose=False, 
 
         if is_success(response):
             if verbose:
-                print(f"[OK] {phone_number} (ID: {stay_user_id}) - 抢红包成功")
+                logger.info("[OK] %s (ID: %s) - 抢红包成功", phone_number, stay_user_id)
             return {
                 "phone": phone_number,
                 "stayUserId": stay_user_id,
@@ -260,7 +285,7 @@ def execute_send_coin_only(credential, room_id, amount, count, condition, distri
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+            logger.info("[RETRY %s/%s] %s (ID: %s)", attempt, retry, phone_number, stay_user_id)
 
         headers = build_business_headers(stay_token)
         send_url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
@@ -284,7 +309,7 @@ def execute_send_coin_only(credential, room_id, amount, count, condition, distri
         if not is_success(send_response):
             error_details = get_error_details(send_response)
             if verbose:
-                print(f"[FAILED] {phone_number} (ID: {stay_user_id}) - 发金币红包失败: {error_details}")
+                logger.warning("[FAILED] %s (ID: %s) - 发金币红包失败: %s", phone_number, stay_user_id, error_details)
             if attempt < retry:
                 actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
                 time.sleep(max(0.5, actual_retry_delay))
@@ -293,14 +318,14 @@ def execute_send_coin_only(credential, room_id, amount, count, condition, distri
         red_packet_id = extract_stay_red_packet_id(send_response)
         if red_packet_id is None:
             if verbose:
-                print(f"[FAILED] {phone_number} (ID: {stay_user_id}) - 发金币红包响应中未找到 stayRedPacketId")
+                logger.warning("[FAILED] %s (ID: %s) - 发金币红包响应中未找到 stayRedPacketId", phone_number, stay_user_id)
             if attempt < retry:
                 actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
                 time.sleep(max(0.5, actual_retry_delay))
             continue
 
         if verbose:
-            print(f"[SEND_OK] {phone_number} (ID: {stay_user_id}) - 金币红包发送成功, stayRedPacketId={red_packet_id}, count={count}")
+            logger.info("[SEND_OK] %s (ID: %s) - 金币红包发送成功, stayRedPacketId=%s, count=%s", phone_number, stay_user_id, red_packet_id, count)
         
         return {
             "ok": True,
@@ -334,7 +359,7 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+            logger.info("[RETRY %s/%s] %s (ID: %s)", attempt, retry, phone_number, stay_user_id)
 
         headers = build_business_headers(stay_token)
         send_url = f"{settings.BASE_URL}{SEND_GIFT_RED_PACKET_PATH}"
@@ -360,7 +385,7 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
         if not is_success(send_response):
             error_details = get_error_details(send_response)
             if verbose:
-                print(f"[FAILED] {phone_number} (ID: {stay_user_id}) - 发礼物红包失败: {error_details}")
+                logger.warning("[FAILED] %s (ID: %s) - 发礼物红包失败: %s", phone_number, stay_user_id, error_details)
             if attempt < retry:
                 actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
                 time.sleep(max(0.5, actual_retry_delay))
@@ -369,14 +394,14 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
         red_packet_id = extract_stay_red_packet_id(send_response)
         if red_packet_id is None:
             if verbose:
-                print(f"[FAILED] {phone_number} (ID: {stay_user_id}) - 发礼物红包响应中未找到 stayRedPacketId")
+                logger.warning("[FAILED] %s (ID: %s) - 发礼物红包响应中未找到 stayRedPacketId", phone_number, stay_user_id)
             if attempt < retry:
                 actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter))
                 time.sleep(max(0.5, actual_retry_delay))
             continue
 
         if verbose:
-            print(f"[SEND_OK] {phone_number} (ID: {stay_user_id}) - 礼物红包发送成功, stayRedPacketId={red_packet_id}, total_count={total_count}")
+            logger.info("[SEND_OK] %s (ID: %s) - 礼物红包发送成功, stayRedPacketId=%s, total_count=%s", phone_number, stay_user_id, red_packet_id, total_count)
         
         return {
             "ok": True,
@@ -431,6 +456,9 @@ def main():
     
     args = parser.parse_args()
 
+    # 配置日志
+    configure_logging(args.verbose)
+
     # 加载登录凭证
     credentials = load_login_credentials()
     if args.max_count > 0:
@@ -440,22 +468,21 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        print("没有找到可用的登录凭证，请检查 data/login_credentials.json")
+        logger.error("没有找到可用的登录凭证，请检查 data/login_credentials.json")
         return
 
     # 确定运行模式
     if args.send_coin:
         # ===== 串联模式：每个用户发一个红包，被随机5人抢完 =====
-        print(f"开始发金币红包并随机抢红包（串联模式）: total={total}, workers={args.workers}, delay={args.delay}")
-        print(f"金币红包参数: room-id={args.room_id}, amount={args.amount}, count={args.count}, condition={args.condition}, distribute-type={args.distribute_type}")
+        logger.info("开始发金币红包并随机抢红包（串联模式）: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
+        logger.info("金币红包参数: room-id=%s, amount=%s, count=%s, condition=%s, distribute-type=%s",
+                    args.room_id, args.amount, args.count, args.condition, args.distribute_type)
         
         if total < 6:
-            print("错误: 串联模式至少需要6个用户（1个发红包 + 5个抢红包）")
+            logger.error("错误: 串联模式至少需要6个用户（1个发红包 + 5个抢红包）")
             sys.exit(1)
         
         # 每个用户发一个红包，每个红包被随机5人抢
-        # 注意：--count 表示每个红包的个数（发给多少人），这里固定为5
-        # 但用户可能传 --count 5，我们内部固定每个红包发5个
         red_packet_count_per_user = 5  # 每个红包被5个人抢
         
         start_time = time.time()
@@ -464,7 +491,7 @@ def main():
         total_receive_failures = []
         
         for sender_idx, sender_cred in enumerate(credentials):
-            print(f"\n--- 用户 {sender_idx + 1}/{total}: {sender_cred['phone_number']} (ID: {sender_cred['stayUserId']}) 发红包 ---")
+            logger.info("--- 用户 %s/%s: %s (ID: %s) 发红包 ---", sender_idx + 1, total, sender_cred['phone_number'], sender_cred['stayUserId'])
             
             # 步骤1: 当前用户发红包（固定发5个）
             send_result = execute_send_coin_only(
@@ -473,19 +500,19 @@ def main():
             )
             
             if not send_result["ok"]:
-                print(f"  [FAILED] 发红包失败: {send_result.get('error_details', '未知错误')}")
+                logger.warning("  [FAILED] 发红包失败: %s", send_result.get('error_details', '未知错误'))
                 total_receive_failures.append(send_result)
                 continue
             
             red_packet_id = send_result["red_packet_id"]
             total_send_success += 1
-            print(f"  [SEND_OK] 红包发送成功, red_packet_id={red_packet_id}")
+            logger.info("  [SEND_OK] 红包发送成功, red_packet_id=%s", red_packet_id)
             
             # 步骤2: 从所有用户中随机选5个不同的用户抢红包（排除发红包者自己）
             other_credentials = [c for i, c in enumerate(credentials) if i != sender_idx]
             selected_receivers = random.sample(other_credentials, min(red_packet_count_per_user, len(other_credentials)))
             
-            print(f"  [RECEIVE] 随机选 {len(selected_receivers)} 个用户抢红包...")
+            logger.info("  [RECEIVE] 随机选 %s 个用户抢红包...", len(selected_receivers))
             
             # 并发抢红包
             with ThreadPoolExecutor(max_workers=args.workers) as executor:
@@ -509,26 +536,30 @@ def main():
                     else:
                         total_receive_failures.append(result)
                         error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                        print(f"    [FAILED] {result['phone']} (ID: {result['stayUserId']}) 抢红包失败: {error_msg[:80]}...")
+                        logger.warning("    [FAILED] %s (ID: %s) 抢红包失败: %s", result['phone'], result['stayUserId'], error_msg[:80])
         
         elapsed = time.time() - start_time
         
-        print(f"\n{'='*50}")
-        print(f"全部完成!")
-        print(f"  发红包成功: {total_send_success}/{total}")
-        print(f"  抢红包成功: {total_receive_success}/{total_send_success * red_packet_count_per_user}")
-        print(f"  抢红包失败: {len(total_receive_failures)}")
-        print(f"  总耗时: {elapsed:.1f}s")
+        logger.info("=" * 50)
+        logger.info("全部完成!")
+        logger.info("  发红包成功: %s/%s", total_send_success, total)
+        logger.info("  抢红包成功: %s/%s", total_receive_success, total_send_success * red_packet_count_per_user)
+        logger.info("  抢红包失败: %s", len(total_receive_failures))
+        logger.info("  总耗时: %.1fs", elapsed)
+        
+        # 清理当前线程的 Session 连接
+        HttpUtils.close_session()
         return
         
     elif args.send_gift:
         # ===== 串联模式：每个用户发一个礼物红包，被随机5人抢完 =====
-        print(f"开始发礼物红包并随机抢红包（串联模式）: total={total}, workers={args.workers}, delay={args.delay}")
-        print(f"礼物红包参数: room-id={args.room_id}, gift-id={args.gift_id}, gift-count={args.gift_count}")
-        print(f"红包参数: total-amount={args.total_amount}, total-count={args.total_count}, condition={args.condition}, distribute-type={args.distribute_type}")
+        logger.info("开始发礼物红包并随机抢红包（串联模式）: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
+        logger.info("礼物红包参数: room-id=%s, gift-id=%s, gift-count=%s", args.room_id, args.gift_id, args.gift_count)
+        logger.info("红包参数: total-amount=%s, total-count=%s, condition=%s, distribute-type=%s",
+                    args.total_amount, args.total_count, args.condition, args.distribute_type)
         
         if total < 6:
-            print("错误: 串联模式至少需要6个用户（1个发红包 + 5个抢红包）")
+            logger.error("错误: 串联模式至少需要6个用户（1个发红包 + 5个抢红包）")
             sys.exit(1)
         
         red_packet_count_per_user = 5  # 每个红包被5个人抢
@@ -539,7 +570,7 @@ def main():
         total_receive_failures = []
         
         for sender_idx, sender_cred in enumerate(credentials):
-            print(f"\n--- 用户 {sender_idx + 1}/{total}: {sender_cred['phone_number']} (ID: {sender_cred['stayUserId']}) 发红包 ---")
+            logger.info("--- 用户 %s/%s: %s (ID: %s) 发红包 ---", sender_idx + 1, total, sender_cred['phone_number'], sender_cred['stayUserId'])
             
             # 步骤1: 当前用户发礼物红包（固定发5个）
             send_result = execute_send_gift_only(
@@ -549,19 +580,19 @@ def main():
             )
             
             if not send_result["ok"]:
-                print(f"  [FAILED] 发红包失败: {send_result.get('error_details', '未知错误')}")
+                logger.warning("  [FAILED] 发红包失败: %s", send_result.get('error_details', '未知错误'))
                 total_receive_failures.append(send_result)
                 continue
             
             red_packet_id = send_result["red_packet_id"]
             total_send_success += 1
-            print(f"  [SEND_OK] 红包发送成功, red_packet_id={red_packet_id}")
+            logger.info("  [SEND_OK] 红包发送成功, red_packet_id=%s", red_packet_id)
             
             # 步骤2: 从所有用户中随机选5个不同的用户抢红包（排除发红包者自己）
             other_credentials = [c for i, c in enumerate(credentials) if i != sender_idx]
             selected_receivers = random.sample(other_credentials, min(red_packet_count_per_user, len(other_credentials)))
             
-            print(f"  [RECEIVE] 随机选 {len(selected_receivers)} 个用户抢红包...")
+            logger.info("  [RECEIVE] 随机选 %s 个用户抢红包...", len(selected_receivers))
             
             # 并发抢红包
             with ThreadPoolExecutor(max_workers=args.workers) as executor:
@@ -585,28 +616,31 @@ def main():
                     else:
                         total_receive_failures.append(result)
                         error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                        print(f"    [FAILED] {result['phone']} (ID: {result['stayUserId']}) 抢红包失败: {error_msg[:80]}...")
+                        logger.warning("    [FAILED] %s (ID: %s) 抢红包失败: %s", result['phone'], result['stayUserId'], error_msg[:80])
         
         elapsed = time.time() - start_time
         
-        print(f"\n{'='*50}")
-        print(f"全部完成!")
-        print(f"  发红包成功: {total_send_success}/{total}")
-        print(f"  抢红包成功: {total_receive_success}/{total_send_success * red_packet_count_per_user}")
-        print(f"  抢红包失败: {len(total_receive_failures)}")
-        print(f"  总耗时: {elapsed:.1f}s")
+        logger.info("=" * 50)
+        logger.info("全部完成!")
+        logger.info("  发红包成功: %s/%s", total_send_success, total)
+        logger.info("  抢红包成功: %s/%s", total_receive_success, total_send_success * red_packet_count_per_user)
+        logger.info("  抢红包失败: %s", len(total_receive_failures))
+        logger.info("  总耗时: %.1fs", elapsed)
+        
+        # 清理当前线程的 Session 连接
+        HttpUtils.close_session()
         return
         
     else:
         # 直接抢模式（需要 --red-packet-id）
         if args.red_packet_id is None:
-            print("错误: 直接抢模式需要指定 --red-packet-id 参数")
-            print("或者使用 --send-coin 或 --send-gift 进入串联模式（自动发红包并抢）")
+            logger.error("错误: 直接抢模式需要指定 --red-packet-id 参数")
+            logger.error("或者使用 --send-coin 或 --send-gift 进入串联模式（自动发红包并抢）")
             sys.exit(1)
         
-        print(f"开始批量抢红包（直接抢模式）: total={total}, workers={args.workers}, delay={args.delay}")
-        print(f"红包ID: {args.red_packet_id}")
-        print(f"忽略已抢完错误: {args.ignore_exhausted}, 忽略重复抢错误: {args.ignore_duplicate}")
+        logger.info("开始批量抢红包（直接抢模式）: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
+        logger.info("红包ID: %s", args.red_packet_id)
+        logger.info("忽略已抢完错误: %s, 忽略重复抢错误: %s", args.ignore_exhausted, args.ignore_duplicate)
         
         receive_credentials = credentials
         task_func = execute_receive_red_packet
@@ -654,25 +688,27 @@ def main():
                     
                     if should_print:
                         error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                        print(f"[FAILED] {result['phone']} (ID: {result['stayUserId']}) stage={result['stage']} attempt={result.get('attempt', 1)}")
-                        print(f"        错误: {error_msg[:100]}...")
+                        logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], result.get('attempt', 1))
+                        logger.debug("        错误: %s", error_msg[:100])
 
         elapsed = time.time() - start_time
         
-        print("\n批量抢红包完成")
-        print(f"  其中: 红包已抢完: {exhausted_count}, 重复抢: {duplicate_count}")
-        print(f"成功: {success_count}/{len(receive_credentials)}, 失败: {len(failures)}")
-        print(f"总耗时: {elapsed:.1f}s")
+        logger.info("批量抢红包完成")
+        logger.info("  其中: 红包已抢完: %s, 重复抢: %s", exhausted_count, duplicate_count)
+        logger.info("成功: %s/%s, 失败: %s, 耗时=%.1fs", success_count, len(receive_credentials), len(failures), elapsed)
+        
+        # 清理当前线程的 Session 连接
+        HttpUtils.close_session()
         
         if failures:
-            print("失败用户列表 (手机号 - 用户ID - 阶段):")
+            logger.warning("失败用户列表 (手机号 - 用户ID - 阶段):")
             for fail in failures:
                 error_type = ""
                 if fail.get("red_packet_exhausted"):
                     error_type = " (红包已抢完)"
                 elif fail.get("already_received"):
                     error_type = " (重复抢)"
-                print(f"  {fail['phone']} - {fail['stayUserId']} stage={fail['stage']}{error_type}")
+                logger.warning("  %s - %s stage=%s%s", fail['phone'], fail['stayUserId'], fail['stage'], error_type)
 
 
 # 直接抢模式（需要指定红包ID）:

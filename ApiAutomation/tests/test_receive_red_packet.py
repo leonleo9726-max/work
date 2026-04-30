@@ -1,35 +1,45 @@
-import time
-import sys
-from pathlib import Path
+"""
+抢红包测试模块。
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+支持多种测试场景：
+1. 使用已知红包 ID 抢红包
+2. 先发金币红包再抢（自动提取红包 ID）
+3. 先发礼物红包再抢（自动提取红包 ID）
+"""
+
+import argparse
+import logging
+import sys
+import time
+from pathlib import Path
 
 import pytest
 
+# conftest.py 已处理 sys.path
+from common.api_paths import RECEIVE_RED_PACKET_PATH, SEND_COIN_RED_PACKET_PATH, SEND_GIFT_RED_PACKET_PATH
+from common.auth_utils import build_business_headers_from_login
 from common.http_utils import HttpUtils
+from common.response_utils import (
+    extract_error_message,
+    extract_stay_red_packet_id,
+    is_api_success,
+)
 from config import settings
-from tests.test_login_phone import build_business_headers_from_login
 
-
-RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
-SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
-SEND_GIFT_RED_PACKET_PATH = "/payer/redPacket/send/gift"
+logger = logging.getLogger(__name__)
 
 
 def receive_red_packet(headers, credential, red_packet_id):
     """抢红包的辅助函数"""
     url = f"{settings.BASE_URL}{RECEIVE_RED_PACKET_PATH}"
-    
+
     payload = {
         "redPacketId": red_packet_id
     }
-    
-    print(f"[receive_red_packet] 发送请求到: {url}")
-    print(f"[receive_red_packet] 请求头: {headers}")
-    print(f"[receive_red_packet] 请求参数: {payload}")
-    
+
+    logger.info(f"发送请求到: {url}")
+    logger.info(f"请求参数: {payload}")
+
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -38,22 +48,21 @@ def receive_red_packet(headers, credential, red_packet_id):
         locale="en",
         timestamp=str(int(time.time() * 1000)),
     )
-    
-    print(f"[receive_red_packet] 完整响应: {response}")
-    
+
+    logger.info(f"完整响应: {response}")
+
     if response is None:
         raise AssertionError("抢红包接口未返回有效响应")
-    
     if not isinstance(response, dict):
         raise AssertionError("抢红包接口返回值应为 JSON 对象")
-    
+
     return response
 
 
 def send_coin_red_packet(headers, credential, total_amount=20000, total_count=1, claim_condition=2, distribute_type=1):
-    """发送金币红包的辅助函数，返回响应中的 stayRedPacketId"""
+    """发送金币红包的辅助函数"""
     url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
-    
+
     payload = {
         "roomId": credential["stayUserId"],
         "totalAmount": total_amount,
@@ -61,10 +70,10 @@ def send_coin_red_packet(headers, credential, total_amount=20000, total_count=1,
         "claimCondition": claim_condition,
         "distributeType": distribute_type,
     }
-    
-    print(f"[send_coin_red_packet] 发送请求到: {url}")
-    print(f"[send_coin_red_packet] 请求参数: {payload}")
-    
+
+    logger.info(f"发送请求到: {url}")
+    logger.info(f"请求参数: {payload}")
+
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -73,22 +82,21 @@ def send_coin_red_packet(headers, credential, total_amount=20000, total_count=1,
         locale="en",
         timestamp=str(int(time.time() * 1000)),
     )
-    
-    print(f"[send_coin_red_packet] 完整响应: {response}")
-    
+
+    logger.info(f"完整响应: {response}")
+
     if response is None:
         raise AssertionError("发送金币红包接口未返回有效响应")
-    
     if not isinstance(response, dict):
         raise AssertionError("发送金币红包接口返回值应为 JSON 对象")
-    
+
     return response
 
 
 def send_gift_red_packet(headers, credential, gift_id=107, gift_count=7, total_amount=266, total_count=5, claim_condition=2, distribute_type=1):
-    """发送礼物红包的辅助函数，返回响应中的 stayRedPacketId"""
+    """发送礼物红包的辅助函数"""
     url = f"{settings.BASE_URL}{SEND_GIFT_RED_PACKET_PATH}"
-    
+
     payload = {
         "roomId": credential["stayUserId"],
         "giftId": gift_id,
@@ -98,10 +106,10 @@ def send_gift_red_packet(headers, credential, gift_id=107, gift_count=7, total_a
         "claimCondition": claim_condition,
         "distributeType": distribute_type,
     }
-    
-    print(f"[send_gift_red_packet] 发送请求到: {url}")
-    print(f"[send_gift_red_packet] 请求参数: {payload}")
-    
+
+    logger.info(f"发送请求到: {url}")
+    logger.info(f"请求参数: {payload}")
+
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -110,72 +118,23 @@ def send_gift_red_packet(headers, credential, gift_id=107, gift_count=7, total_a
         locale="en",
         timestamp=str(int(time.time() * 1000)),
     )
-    
-    print(f"[send_gift_red_packet] 完整响应: {response}")
-    
+
+    logger.info(f"完整响应: {response}")
+
     if response is None:
         raise AssertionError("发送礼物红包接口未返回有效响应")
-    
     if not isinstance(response, dict):
         raise AssertionError("发送礼物红包接口返回值应为 JSON 对象")
-    
+
     return response
-
-
-def extract_stay_red_packet_id(response):
-    """从发红包接口的响应中提取 stayRedPacketId
-    
-    支持多种响应结构：
-    - {"code": 0, "data": {"stayRedPacketId": "xxx"}}
-    - {"stayCode": 200, "stayResult": {"stayRedPacketId": "xxx"}}
-    - {"stayRedPacketId": "xxx"}
-    - {"data": {"stayRedPacketId": "xxx"}}
-    """
-    if not isinstance(response, dict):
-        return None
-    
-    # 尝试从 stayResult 中提取
-    stay_result = response.get("stayResult")
-    if isinstance(stay_result, dict):
-        red_packet_id = stay_result.get("stayRedPacketId")
-        if red_packet_id is not None:
-            return red_packet_id
-    
-    # 尝试从 data 中提取
-    data = response.get("data")
-    if isinstance(data, dict):
-        red_packet_id = data.get("stayRedPacketId")
-        if red_packet_id is not None:
-            return red_packet_id
-    
-    # 尝试从响应顶层提取
-    red_packet_id = response.get("stayRedPacketId")
-    if red_packet_id is not None:
-        return red_packet_id
-    
-    return None
 
 
 def check_response_success(response, context="操作"):
     """检查接口响应是否成功，失败时抛出 pytest.fail"""
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-    
-    if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+    if not is_api_success(response):
+        error_message = extract_error_message(response)
         pytest.fail(f"{context}失败: {error_message}, 完整响应: {response}")
-    
-    return success
+    return True
 
 
 @pytest.mark.api
@@ -189,7 +148,7 @@ def check_response_success(response, context="操作"):
 )
 def test_receive_red_packet(request, phone_number, red_packet_id):
     """抢红包接口测试，从 login_credentials.json 读取登录凭证。
-    
+
     注意：此测试使用硬编码的 red_packet_id，适用于已知红包ID的场景。
     推荐使用 test_send_coin_then_receive 或 test_send_gift_then_receive，
     它们会先发红包再抢，自动从发红包响应中提取 stayRedPacketId。
@@ -201,17 +160,13 @@ def test_receive_red_packet(request, phone_number, red_packet_id):
     assert credential["stayToken"], "读取到的 stayToken 不能为空"
     assert credential["stayUserId"], "读取到的 stayUserId 不能为空"
 
-    # 记录请求头中的 token
     token = credential["stayToken"]
-    print(f"[receive_red_packet] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
-    # 抢红包并获取完整响应
     response = receive_red_packet(headers, credential, red_packet_id)
-
-    # 检查响应是否成功
     check_response_success(response, "抢红包")
 
-    print(f"[receive_red_packet] 用户 {credential['stayUserId']} 抢红包成功，红包ID: {red_packet_id}，响应: {response}")
+    logger.info(f"用户 {credential['stayUserId']} 抢红包成功，红包ID: {red_packet_id}，响应: {response}")
 
 
 @pytest.mark.api
@@ -234,10 +189,10 @@ def test_send_coin_then_receive(request, phone_number, total_amount, total_count
     assert credential["stayUserId"], "读取到的 stayUserId 不能为空"
 
     token = credential["stayToken"]
-    print(f"[send_coin_then_receive] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
     # 2. 发送金币红包
-    print(f"[send_coin_then_receive] 步骤1: 发送金币红包...")
+    logger.info("步骤1: 发送金币红包...")
     send_response = send_coin_red_packet(
         headers, credential,
         total_amount=total_amount,
@@ -245,8 +200,6 @@ def test_send_coin_then_receive(request, phone_number, total_amount, total_count
         claim_condition=claim_condition,
         distribute_type=distribute_type,
     )
-
-    # 检查发红包是否成功
     check_response_success(send_response, "发送金币红包")
 
     # 3. 从响应中提取 stayRedPacketId
@@ -254,17 +207,15 @@ def test_send_coin_then_receive(request, phone_number, total_amount, total_count
     assert red_packet_id is not None, (
         f"发送金币红包响应中未找到 stayRedPacketId，完整响应: {send_response}"
     )
-    print(f"[send_coin_then_receive] 步骤2: 从发红包响应中提取到 stayRedPacketId = {red_packet_id}")
+    logger.info(f"步骤2: 从发红包响应中提取到 stayRedPacketId = {red_packet_id}")
 
     # 4. 使用提取到的 red_packet_id 抢红包
-    print(f"[send_coin_then_receive] 步骤3: 使用 red_packet_id={red_packet_id} 抢红包...")
+    logger.info(f"步骤3: 使用 red_packet_id={red_packet_id} 抢红包...")
     receive_response = receive_red_packet(headers, credential, red_packet_id)
-
-    # 检查抢红包是否成功
     check_response_success(receive_response, "抢红包")
 
-    print(f"[send_coin_then_receive] 用户 {credential['stayUserId']} 发金币红包并抢红包成功，"
-          f"red_packet_id={red_packet_id}，抢红包响应: {receive_response}")
+    logger.info(f"用户 {credential['stayUserId']} 发金币红包并抢红包成功，"
+                f"red_packet_id={red_packet_id}，抢红包响应: {receive_response}")
 
 
 @pytest.mark.api
@@ -287,10 +238,10 @@ def test_send_gift_then_receive(request, phone_number, gift_id, gift_count, tota
     assert credential["stayUserId"], "读取到的 stayUserId 不能为空"
 
     token = credential["stayToken"]
-    print(f"[send_gift_then_receive] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
+    logger.info(f"用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
 
     # 2. 发送礼物红包
-    print(f"[send_gift_then_receive] 步骤1: 发送礼物红包...")
+    logger.info("步骤1: 发送礼物红包...")
     send_response = send_gift_red_packet(
         headers, credential,
         gift_id=gift_id,
@@ -300,8 +251,6 @@ def test_send_gift_then_receive(request, phone_number, gift_id, gift_count, tota
         claim_condition=claim_condition,
         distribute_type=distribute_type,
     )
-
-    # 检查发红包是否成功
     check_response_success(send_response, "发送礼物红包")
 
     # 3. 从响应中提取 stayRedPacketId
@@ -309,60 +258,49 @@ def test_send_gift_then_receive(request, phone_number, gift_id, gift_count, tota
     assert red_packet_id is not None, (
         f"发送礼物红包响应中未找到 stayRedPacketId，完整响应: {send_response}"
     )
-    print(f"[send_gift_then_receive] 步骤2: 从发红包响应中提取到 stayRedPacketId = {red_packet_id}")
+    logger.info(f"步骤2: 从发红包响应中提取到 stayRedPacketId = {red_packet_id}")
 
     # 4. 使用提取到的 red_packet_id 抢红包
-    print(f"[send_gift_then_receive] 步骤3: 使用 red_packet_id={red_packet_id} 抢红包...")
+    logger.info(f"步骤3: 使用 red_packet_id={red_packet_id} 抢红包...")
     receive_response = receive_red_packet(headers, credential, red_packet_id)
-
-    # 检查抢红包是否成功
     check_response_success(receive_response, "抢红包")
 
-    print(f"[send_gift_then_receive] 用户 {credential['stayUserId']} 发礼物红包并抢红包成功，"
-          f"red_packet_id={red_packet_id}，抢红包响应: {receive_response}")
+    logger.info(f"用户 {credential['stayUserId']} 发礼物红包并抢红包成功，"
+                f"red_packet_id={red_packet_id}，抢红包响应: {receive_response}")
 
 
 def parse_args():
     """解析命令行参数"""
-    import argparse
     parser = argparse.ArgumentParser(description="抢红包测试")
     parser.add_argument("--phone", type=str, default="15200711073",
-                       help="手机号码，默认: 15200711073")
+                        help="手机号码，默认: 15200711073")
     parser.add_argument("--red-packet-id", type=int, default=1,
-                       help="红包ID，默认: 1")
+                        help="红包ID，默认: 1")
     parser.add_argument("--run-api", action="store_true",
-                       help="执行真实API测试（需要此参数才会调用接口）")
+                        help="执行真实API测试（需要此参数才会调用接口）")
     parser.add_argument("--verbose", action="store_true",
-                       help="打印详细日志")
+                        help="打印详细日志")
     return parser.parse_args()
 
 
 def _receive_red_packet_direct(phone_number, red_packet_id):
     """直接运行模式下的抢红包函数"""
-    import sys
-    from tests.test_login_phone import build_business_headers_from_login
-    from config import settings
-    from common.http_utils import HttpUtils
-    
-    # 获取登录凭证
     headers, credential = build_business_headers_from_login(phone_number=phone_number)
     if not credential.get("stayToken") or not credential.get("stayUserId"):
         print(f"错误: 用户 {phone_number} 登录凭证无效")
         sys.exit(1)
-    
-    # 记录请求头中的 token
+
     token = credential["stayToken"]
     print(f"[直接运行] 用户 {credential['stayUserId']} 的 token: {token[:20]}... (长度: {len(token)})")
-    
+
     url = f"{settings.BASE_URL}{RECEIVE_RED_PACKET_PATH}"
     payload = {
         "redPacketId": red_packet_id
     }
-    
+
     print(f"[直接运行] 抢红包参数: {payload}")
     print(f"[直接运行] 请求URL: {url}")
-    
-    # 发送请求
+
     response = HttpUtils.post(
         url=url,
         data=payload,
@@ -371,22 +309,13 @@ def _receive_red_packet_direct(phone_number, red_packet_id):
         locale="en",
         timestamp=str(int(time.time() * 1000)),
     )
-    
+
     print(f"[直接运行] 完整响应: {response}")
-    
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-    
-    if success:
+
+    if is_api_success(response):
         print(f"[直接运行] 抢红包成功")
         return True
     else:
-        # 不打印详细错误信息，只返回False
         return False
 
 
@@ -394,17 +323,17 @@ if __name__ == "__main__":
     args = parse_args()
     print(f"[命令行参数] phone={args.phone}, red-packet-id={args.red_packet_id}, "
           f"run-api={args.run_api}, verbose={args.verbose}")
-    
+
     if not args.run_api:
         print("警告: 需要 --run-api 参数才会执行真实API测试")
         print("示例: python tests/test_receive_red_packet.py --run-api --phone 15200711073 --red-packet-id 1")
         sys.exit(0)
-    
+
     success = _receive_red_packet_direct(
         phone_number=args.phone,
         red_packet_id=args.red_packet_id,
     )
-    
+
     if success:
         print("[直接运行] 测试通过")
         sys.exit(0)

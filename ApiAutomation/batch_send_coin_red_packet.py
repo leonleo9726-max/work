@@ -1,5 +1,16 @@
+"""
+批量发送金币红包脚本（多线程 + 连接池）。
+
+支持两种模式：
+1. 仅发送金币红包（--skip-receive）
+2. 发送金币红包并自动抢红包（串联模式）
+
+通过 HttpUtils 连接池复用 HTTP 连接。
+"""
+
 import argparse
 import json
+import logging
 import random
 import sys
 import time
@@ -13,6 +24,19 @@ if str(PROJECT_ROOT) not in sys.path:
 from common.http_utils import HttpUtils
 from config import settings
 
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(verbose: bool = False):
+    """配置日志输出"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
+    )
+
 
 SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
 RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
@@ -22,8 +46,8 @@ def load_login_credentials():
     """从JSON文件加载登录凭证"""
     credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
     if not credentials_file.exists():
-        print(f"错误: 登录凭证文件不存在: {credentials_file}")
-        print("请先运行 batch_login.py --save-credentials 生成登录凭证")
+        logger.error("错误: 登录凭证文件不存在: %s", credentials_file)
+        logger.error("请先运行 batch_login.py --save-credentials 生成登录凭证")
         sys.exit(1)
     
     with credentials_file.open("r", encoding="utf-8") as f:
@@ -145,7 +169,7 @@ def execute_send_coin_only(credential, amount, count, condition, distribute_type
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+            logger.info("[RETRY %s/%s] %s (ID: %s)", attempt, retry, phone_number, stay_user_id)
 
         # 构建请求
         headers = build_business_headers(stay_token)
@@ -170,7 +194,7 @@ def execute_send_coin_only(credential, amount, count, condition, distribute_type
 
         if is_success(response):
             if verbose:
-                print(f"[OK] {phone_number} (ID: {stay_user_id}) - 红包发送成功")
+                logger.info("[OK] %s (ID: %s) - 红包发送成功", phone_number, stay_user_id)
             return {
                 "phone": phone_number,
                 "stayUserId": stay_user_id,
@@ -214,7 +238,7 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
             time.sleep(max(0.1, actual_delay))
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number} (ID: {stay_user_id})")
+            logger.info("[RETRY %s/%s] %s (ID: %s)", attempt, retry, phone_number, stay_user_id)
 
         # ===== 步骤1: 发送金币红包 =====
         headers = build_business_headers(stay_token)
@@ -270,7 +294,7 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
             continue
 
         if verbose:
-            print(f"[SEND_OK] {phone_number} (ID: {stay_user_id}) - 金币红包发送成功, stayRedPacketId={red_packet_id}")
+            logger.info("[SEND_OK] %s (ID: %s) - 金币红包发送成功, stayRedPacketId=%s", phone_number, stay_user_id, red_packet_id)
 
         # ===== 步骤3: 使用提取到的 red_packet_id 抢红包 =====
         receive_url = f"{settings.BASE_URL}{RECEIVE_RED_PACKET_PATH}"
@@ -289,7 +313,7 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
 
         if is_success(receive_response):
             if verbose:
-                print(f"[OK] {phone_number} (ID: {stay_user_id}) - 发金币红包并抢红包成功, red_packet_id={red_packet_id}")
+                logger.info("[OK] %s (ID: %s) - 发金币红包并抢红包成功, red_packet_id=%s", phone_number, stay_user_id, red_packet_id)
             return {
                 "phone": phone_number,
                 "stayUserId": stay_user_id,
@@ -344,6 +368,9 @@ def main():
     
     args = parser.parse_args()
 
+    # 配置日志
+    configure_logging(args.verbose)
+
     # 加载登录凭证
     credentials = load_login_credentials()
     if args.max_count > 0:
@@ -353,18 +380,18 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        print("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
+        logger.error("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
         return
 
     if args.skip_receive:
-        print(f"开始批量发送金币红包（仅发送，跳过抢红包）: total={total}, workers={args.workers}, delay={args.delay}")
+        logger.info("开始批量发送金币红包（仅发送，跳过抢红包）: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
         task_func = execute_send_coin_only
     else:
-        print(f"开始批量发送金币红包并自动抢红包（串联模式）: total={total}, workers={args.workers}, delay={args.delay}")
+        logger.info("开始批量发送金币红包并自动抢红包（串联模式）: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
         task_func = execute_send_coin_and_receive
     
     room_id_info = f", room_id={args.room_id}" if args.room_id else ", room_id=每个用户的stayUserId(默认)"
-    print(f"红包参数: amount={args.amount}, count={args.count}, condition={args.condition}, distribute-type={args.distribute_type}{room_id_info}")
+    logger.info("红包参数: amount=%s, count=%s, condition=%s, distribute-type=%s%s", args.amount, args.count, args.condition, args.distribute_type, room_id_info)
 
     success_count = 0
     failures = []
@@ -396,18 +423,19 @@ def main():
             else:
                 failures.append(result)
                 error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                print(f"[FAILED] {result['phone']} (ID: {result['stayUserId']}) stage={result['stage']} attempt={result.get('attempt', 1)}")
-                print(f"        错误: {error_msg[:100]}...")
+                logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], result.get('attempt', 1))
+                logger.debug("        错误: %s", error_msg[:100])
 
     elapsed = time.time() - start_time
-    print("\n批量发送金币红包完成")
-    print(f"成功: {success_count}/{total}, 失败: {len(failures)}")
-    print(f"总耗时: {elapsed:.1f}s")
+    logger.info("批量发送金币红包完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
+    
+    # 清理当前线程的 Session 连接
+    HttpUtils.close_session()
     
     if failures:
-        print("失败用户列表 (手机号 - 用户ID - 阶段):")
+        logger.warning("失败用户列表 (手机号 - 用户ID - 阶段):")
         for fail in failures:
-            print(f"  {fail['phone']} - {fail['stayUserId']} stage={fail['stage']}")
+            logger.warning("  %s - %s stage=%s", fail['phone'], fail['stayUserId'], fail['stage'])
 
 
 # 串联模式（发金币红包 + 自动抢红包）:

@@ -1,5 +1,12 @@
+"""
+批量注册脚本（多线程 + 连接池）。
+
+使用 ThreadPoolExecutor 并发执行注册，通过 HttpUtils 连接池复用 HTTP 连接。
+"""
+
 import argparse
 import csv
+import logging
 import random
 import sys
 import time
@@ -12,6 +19,19 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from common.http_utils import HttpUtils
 from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(verbose: bool = False):
+    """配置日志输出"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
+    )
 
 
 def load_csv_values(data_file: Path, field_name: str):
@@ -131,7 +151,7 @@ def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, 
             time.sleep(delay)
 
         if verbose and attempt > 1:
-            print(f"[RETRY {attempt}/{retry}] {phone_number}")
+            logger.info("[RETRY %s/%s] %s", attempt, retry, phone_number)
 
         send_code_payload = create_send_code_params(phone_number, unique_id)
         send_response = HttpUtils.post(
@@ -163,7 +183,7 @@ def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, 
 
         if is_success(register_response):
             if verbose:
-                print(f"[OK] {phone_number}")
+                logger.info("[OK] %s", phone_number)
             return {"phone": phone_number, "ok": True}
 
         last_failure = {
@@ -189,6 +209,9 @@ def main():
     parser.add_argument("--max-count", type=int, default=0, help="最多注册多少个手机号，默认0表示全部")
     args = parser.parse_args()
 
+    # 配置日志
+    configure_logging(args.verbose)
+
     phones = load_csv_values(PROJECT_ROOT / "data" / "register_phone.csv", "phone_number")
     unique_ids = load_csv_values(PROJECT_ROOT / "data" / "device_ids.csv", "uniqueId")
 
@@ -200,10 +223,10 @@ def main():
     test_cases = allocate_unique_ids(phones, unique_ids)
     total = len(test_cases)
     if total == 0:
-        print("没有找到可注册的手机号，请检查 data/register_phone.csv")
+        logger.error("没有找到可注册的手机号，请检查 data/register_phone.csv")
         return
 
-    print(f"开始批量注册: total={total}, workers={args.workers}, delay={args.delay}")
+    logger.info("开始批量注册: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
 
     success_count = 0
     failures = []
@@ -227,16 +250,19 @@ def main():
                 success_count += 1
             else:
                 failures.append(result)
-                print(f"[FAILED] {result['phone']} stage={result['stage']} response={result['response']}")
+                logger.warning("[FAILED] %s stage=%s", result['phone'], result['stage'])
 
     elapsed = time.time() - start_time
-    print("\n批量注册完成")
-    print(f"成功: {success_count}/{total}, 失败: {len(failures)}")
-    print(f"总耗时: {elapsed:.1f}s")
+    logger.info("批量注册完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
+
+    # 清理当前线程的 Session 连接
+    HttpUtils.close_session()
+
     if failures:
-        print("失败手机号列表:")
+        logger.warning("失败手机号列表:")
         for fail in failures:
-            print(f"  {fail['phone']} stage={fail['stage']}")
+            logger.warning("  %s stage=%s", fail['phone'], fail['stage'])
+
 
 # 多线程批量注册 python batch_register.py --workers 10 --delay 0.5
 # --workers 10：使用 10 个线程并发执行

@@ -1,19 +1,34 @@
-import pytest
-import base64
-import json
-import time
-import sys
-import csv
+"""
+手机登录测试模块。
+
+提供手机号密码登录的测试用例和辅助函数。
+登录凭证管理已统一迁移至 common/auth_utils.py。
+"""
+
 import argparse
+import csv
+import logging
+import sys
+import time
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+import pytest
 
+# conftest.py 已处理 sys.path，此处不再需要
+from common.api_paths import LOGIN_PHONE_PATH
+from common.auth_utils import (
+    get_login_credentials_by_phone,
+    load_login_credentials_from_json,
+    store_login_credentials,
+    to_base64,
+)
 from common.http_utils import HttpUtils
+from common.response_utils import extract_login_info, is_api_success
 from config import settings
 
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOGIN_CREDENTIALS_FILE = PROJECT_ROOT / "data" / "login_credentials.json"
 
 
@@ -21,17 +36,17 @@ def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="单用户手机登录测试")
     parser.add_argument("--phone", type=str, default="15200711073",
-                       help="手机号码，默认: 15200711073")
+                        help="手机号码，默认: 15200711073")
     parser.add_argument("--code", type=str, default="8888",
-                       help="验证码，默认: 8888")
+                        help="验证码，默认: 8888")
     parser.add_argument("--area", type=str, default="86",
-                       help="区号，默认: 86")
+                        help="区号，默认: 86")
     parser.add_argument("--password", type=str, default="a123456",
-                       help="密码，默认: a123456（会自动进行base64编码）")
+                        help="密码，默认: a123456（会自动进行base64编码）")
     parser.add_argument("--run-api", action="store_true",
-                       help="执行真实API测试（需要此参数才会调用接口）")
+                        help="执行真实API测试（需要此参数才会调用接口）")
     parser.add_argument("--verbose", action="store_true",
-                       help="打印详细日志")
+                        help="打印详细日志")
     return parser.parse_args()
 
 
@@ -51,13 +66,6 @@ def load_phones_from_csv():
 
 # 为了向后兼容，保留 PHONE_CASES 变量
 PHONE_CASES = load_phones_from_csv()
-
-
-def _to_base64(value):
-    """将字符串转为 base64 文本。"""
-    if value is None:
-        return None
-    return base64.b64encode(str(value).encode("utf-8")).decode("utf-8")
 
 
 def create_login_phone_params(
@@ -103,18 +111,10 @@ def create_login_phone_params(
         "useRoot": 0,
         "useDebug": 0,
         "mockLocation": 0,
-        "timezone":  "Asia/Shanghai",
-        "languageCountry": "en",
-        "appLanguage": "en",
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "password": "a123456",
-        "verificationCode": verification_code,
-        "captchaType": 0,
-        "loginPwdType": 0,
+        "timezone": "Asia/Shanghai",
     }
     params.update(kwargs)
-    params["password"] = _to_base64(params.get("password"))
+    params["password"] = to_base64(params.get("password"))
     return params
 
 
@@ -122,7 +122,7 @@ def login_with_phone(payload, encrypt_key):
     """调用手机登录接口（统一使用一种 header 模式）。"""
     locale = str(payload.get("language", "en"))
     timestamp = str(int(time.time() * 1000))
-    url = f"{settings.BASE_URL}{settings.LOGIN_PHONE_PATH}"
+    url = f"{settings.BASE_URL}{LOGIN_PHONE_PATH}"
     headers = settings.build_common_encrypted_headers()
     return HttpUtils.post(
         url=url,
@@ -132,81 +132,6 @@ def login_with_phone(payload, encrypt_key):
         locale=locale,
         timestamp=timestamp,
     )
-
-
-def _is_login_success(response):
-    """根据常见返回结构判断是否登录成功。"""
-    if not isinstance(response, dict):
-        return False
-
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-
-    data = response.get("data")
-    if isinstance(data, dict):
-        if data.get("token") or data.get("accessToken") or data.get("jwt"):
-            return True
-
-    return False
-
-
-LOGIN_CREDENTIALS = {}
-
-
-def extract_login_user_info(response):
-    """从登录响应中提取 stayUserId 和 stayToken。"""
-    if not isinstance(response, dict):
-        return None
-
-    candidates = []
-    if isinstance(response.get("stayResult"), dict):
-        candidates.append(response["stayResult"])
-    if isinstance(response.get("data"), dict):
-        candidates.append(response["data"])
-    candidates.append(response)
-
-    for data in candidates:
-        if not isinstance(data, dict):
-            continue
-        stay_user_id = data.get("stayUserId")
-        stay_token = data.get("stayToken")
-        if stay_user_id and stay_token:
-            return {
-                "stayUserId": str(stay_user_id),
-                "stayToken": str(stay_token),
-            }
-    return None
-
-
-def store_login_credentials(phone_number, login_info):
-    """存储登录凭证，保证 stayUserId 与 stayToken 一一对应。"""
-    if not login_info:
-        return
-
-    user_id = login_info["stayUserId"]
-    token = login_info["stayToken"]
-
-    existing = LOGIN_CREDENTIALS.get(user_id)
-    if existing and existing["stayToken"] != token:
-        raise AssertionError(
-            f"用户ID {user_id} 已存在不同 token：{existing['stayToken']} vs {token}"
-        )
-
-    LOGIN_CREDENTIALS[user_id] = {
-        "phone_number": phone_number,
-        "stayUserId": user_id,
-        "stayToken": token,
-    }
-    save_login_credentials_to_json()
 
 
 def login_phone_and_store(phone_number, encrypt_key, verification_code="8888", area_code="86", **kwargs):
@@ -222,20 +147,14 @@ def login_phone_and_store(phone_number, encrypt_key, verification_code="8888", a
     if response is None or not isinstance(response, dict):
         raise RuntimeError("登录接口返回为空或非 JSON 数据")
 
-    login_success = _is_login_success(response)
-    login_info = extract_login_user_info(response)
+    login_success = is_api_success(response)
+    login_info = extract_login_info(response)
     if login_info:
         store_login_credentials(phone_number, login_info)
 
     if not login_success:
-        error_message = (
-            response.get("stayErrorMessage")
-            or response.get("stayMessage")
-            or response.get("errorMessage")
-            or response.get("message")
-            or response.get("msg")
-            or "未知错误"
-        )
+        from common.response_utils import extract_error_message
+        error_message = extract_error_message(response)
         raise RuntimeError(
             f"登录失败: phone={phone_number}, message={error_message}, response={response}"
         )
@@ -249,65 +168,6 @@ def ensure_login_credentials(phone_number, encrypt_key):
     if credential:
         return credential
     return login_phone_and_store(phone_number, encrypt_key)
-
-
-def _ensure_login_credentials_file():
-    if not LOGIN_CREDENTIALS_FILE.parent.exists():
-        LOGIN_CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-
-def save_login_credentials_to_json():
-    _ensure_login_credentials_file()
-    with LOGIN_CREDENTIALS_FILE.open("w", encoding="utf-8") as file:
-        json.dump(LOGIN_CREDENTIALS, file, ensure_ascii=False, indent=2)
-
-
-def load_login_credentials_from_json():
-    if not LOGIN_CREDENTIALS_FILE.exists():
-        return {}
-    try:
-        with LOGIN_CREDENTIALS_FILE.open("r", encoding="utf-8") as file:
-            return json.load(file) or {}
-    except (json.JSONDecodeError, IOError):
-        return {}
-
-
-def get_login_credentials_by_user_id(stay_user_id):
-    user_id = str(stay_user_id)
-    if user_id in LOGIN_CREDENTIALS:
-        return LOGIN_CREDENTIALS[user_id]
-    persisted = load_login_credentials_from_json()
-    return persisted.get(user_id)
-
-
-def get_login_credentials_by_phone(phone_number):
-    for value in LOGIN_CREDENTIALS.values():
-        if value["phone_number"] == phone_number:
-            return value
-    persisted = load_login_credentials_from_json()
-    for value in persisted.values():
-        if value.get("phone_number") == phone_number:
-            return value
-    return None
-
-
-def build_business_headers_from_login(phone_number=None, stay_user_id=None):
-    """从持久化登录 token 构建后续业务请求的 headers。"""
-    credential = None
-    if phone_number:
-        credential = get_login_credentials_by_phone(phone_number)
-    elif stay_user_id:
-        credential = get_login_credentials_by_user_id(stay_user_id)
-
-    if credential is None:
-        raise ValueError(
-            "未找到登录凭证，请先执行登录并生成 data/login_credentials.json。"
-        )
-
-    headers = settings.build_common_encrypted_headers()
-    # 根据API文档示例，token应该直接放在'token'字段中，而不是'Authorization: Bearer'
-    headers["token"] = credential['stayToken']
-    return headers, credential
 
 
 def test_create_login_phone_params_contains_required_fields():
@@ -329,7 +189,7 @@ def test_login_phone_api_single(request, encrypt_key):
     """单用户登录测试，支持命令行参数"""
     if not request.config.getoption("--run-api"):
         pytest.skip("need --run-api option to execute real API tests")
-    
+
     # 解析命令行参数
     args = parse_args()
     phone_number = args.phone
@@ -337,41 +197,35 @@ def test_login_phone_api_single(request, encrypt_key):
     area_code = args.area
     password = args.password
     verbose = args.verbose
-    
+
     if verbose:
-        print(f"[命令行参数] phone={phone_number}, code={verification_code}, area={area_code}, password={password}")
-    
+        logger.info(f"phone={phone_number}, code={verification_code}, area={area_code}, password={password}")
+
     payload = create_login_phone_params(
         phone_number=phone_number,
         verification_code=verification_code,
         area_code=area_code,
-        password=password
+        password=password,
     )
     response = login_with_phone(payload, encrypt_key)
 
     assert response is not None
     assert isinstance(response, dict)
 
-    login_success = _is_login_success(response)
+    login_success = is_api_success(response)
 
-    login_info = extract_login_user_info(response)
+    login_info = extract_login_info(response)
     if login_info:
         store_login_credentials(phone_number, login_info)
-    
-    print(f"[login_phone] phone={phone_number}, 响应: {response}")
-    print(f"[login_phone] phone={phone_number}, 登录结果: success={login_success}")
+
+    logger.info(f"phone={phone_number}, 响应: {response}")
+    logger.info(f"phone={phone_number}, 登录结果: success={login_success}")
     if login_info:
-        print(f"[login_phone] phone={phone_number}, stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
+        logger.info(f"phone={phone_number}, stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
 
     if not login_success:
-        error_message = (
-            response.get("stayErrorMessage")
-            or response.get("stayMessage")
-            or response.get("errorMessage")
-            or response.get("message")
-            or response.get("msg")
-            or "未知错误"
-        )
+        from common.response_utils import extract_error_message
+        error_message = extract_error_message(response)
         pytest.fail(
             f"登录失败: phone={phone_number}, code={response.get('code')}, "
             f"stayCode={response.get('stayCode')}, message={error_message}, response={response}"
@@ -394,26 +248,20 @@ def test_login_phone_api_batch(request, encrypt_key, phone_number):
     assert response is not None
     assert isinstance(response, dict)
 
-    login_success = _is_login_success(response)
+    login_success = is_api_success(response)
 
-    login_info = extract_login_user_info(response)
+    login_info = extract_login_info(response)
     if login_info:
         store_login_credentials(phone_number, login_info)
-    
-    print(f"[login_phone] phone={phone_number}, 响应: {response}")
-    print(f"[login_phone] phone={phone_number}, 登录结果: success={login_success}")
+
+    logger.info(f"phone={phone_number}, 响应: {response}")
+    logger.info(f"phone={phone_number}, 登录结果: success={login_success}")
     if login_info:
-        print(f"[login_phone] phone={phone_number}, stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
+        logger.info(f"phone={phone_number}, stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
 
     if not login_success:
-        error_message = (
-            response.get("stayErrorMessage")
-            or response.get("stayMessage")
-            or response.get("errorMessage")
-            or response.get("message")
-            or response.get("msg")
-            or "未知错误"
-        )
+        from common.response_utils import extract_error_message
+        error_message = extract_error_message(response)
         pytest.fail(
             f"登录失败: phone={phone_number}, code={response.get('code')}, "
             f"stayCode={response.get('stayCode')}, message={error_message}, response={response}"
@@ -429,30 +277,28 @@ def _build_debug_payload(phone=None, code=None, area=None, password=None):
         phone_number=phone or "15200711073",
         verification_code=code or "8888",
         area_code=area or "86",
-        password=password or "a123456"
+        password=password or "a123456",
     )
 
 
 if __name__ == "__main__":
     args = parse_args()
-    print(f"[命令行参数] phone={args.phone}, code={args.code}, area={args.area}, password={args.password}, run-api={args.run_api}, verbose={args.verbose}")
-    
+    logger.info(f"phone={args.phone}, code={args.code}, area={args.area}, password={args.password}, run-api={args.run_api}, verbose={args.verbose}")
+
     if not args.run_api:
         print("警告: 需要 --run-api 参数才会执行真实API测试")
-        print("示例: python test_login_phone.py --run-api --phone 15200711073 --code 8888 --area 86 --password a123456")
+        print("示例: python tests/test_login_phone.py --run-api --phone 15200711073 --code 8888 --area 86 --password a123456")
         sys.exit(0)
-    
+
     payload = _build_debug_payload(phone=args.phone, code=args.code, area=args.area, password=args.password)
     print("[login_phone][debug] direct run mode enabled")
     response = login_with_phone(payload, settings.TEST_ENCRYPT_KEY)
     print(f"[login_phone] 响应: {response}")
-    print(f"[login_phone] 登录结果: success={_is_login_success(response)}")
-    
+    print(f"[login_phone] 登录结果: success={is_api_success(response)}")
+
     # 提取登录信息
-    login_info = extract_login_user_info(response)
+    login_info = extract_login_info(response)
     if login_info:
         print(f"[login_phone] stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
         store_login_credentials(args.phone, login_info)
         print(f"[login_phone] 登录凭证已保存")
-
-# 命令行运行 python tests/test_login_phone.py --run-api --phone 15200711073 --code 8888 --area 86 --password a123456
