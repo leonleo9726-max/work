@@ -20,7 +20,7 @@ RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
 
 def load_login_credentials():
     """从JSON文件加载登录凭证"""
-    credentials_file = PROJECT_ROOT / "data" / "login_credentials.json"
+    credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
     if not credentials_file.exists():
         print(f"错误: 登录凭证文件不存在: {credentials_file}")
         print("请先运行 batch_login.py --save-credentials 生成登录凭证")
@@ -31,10 +31,10 @@ def load_login_credentials():
     
     # 转换为列表，每个元素包含手机号和凭证信息
     credential_list = []
-    for stay_user_id, cred in credentials.items():
+    for phone_number, cred in credentials.items():
         credential_list.append({
-            "stayUserId": stay_user_id,
-            "phone_number": cred.get("phone_number", ""),
+            "stayUserId": cred.get("stayUserId", ""),
+            "phone_number": cred.get("phone_number", phone_number),
             "stayToken": cred.get("stayToken", ""),
             "uniqueId": cred.get("uniqueId", "")
         })
@@ -129,11 +129,14 @@ def extract_stay_red_packet_id(response):
     return None
 
 
-def execute_send_coin_only(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
+def execute_send_coin_only(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3, room_id=None):
     """仅发送金币红包（向后兼容模式）"""
     stay_user_id = credential["stayUserId"]
     phone_number = credential["phone_number"]
     stay_token = credential["stayToken"]
+    
+    # 如果未指定 room_id，则使用 stayUserId 作为默认值
+    actual_room_id = room_id if room_id is not None else stay_user_id
     
     last_failure = None
     for attempt in range(1, retry + 1):
@@ -148,7 +151,7 @@ def execute_send_coin_only(credential, amount, count, condition, distribute_type
         headers = build_business_headers(stay_token)
         url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
         payload = {
-            "roomId": stay_user_id,
+            "roomId": actual_room_id,
             "totalAmount": amount,
             "totalCount": count,
             "claimCondition": condition,
@@ -195,11 +198,14 @@ def execute_send_coin_only(credential, amount, count, condition, distribute_type
     return last_failure
 
 
-def execute_send_coin_and_receive(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
+def execute_send_coin_and_receive(credential, amount, count, condition, distribute_type, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3, room_id=None):
     """执行单个金币红包发送 + 自动抢红包的串联任务"""
     stay_user_id = credential["stayUserId"]
     phone_number = credential["phone_number"]
     stay_token = credential["stayToken"]
+    
+    # 如果未指定 room_id，则使用 stayUserId 作为默认值
+    actual_room_id = room_id if room_id is not None else stay_user_id
     
     last_failure = None
     for attempt in range(1, retry + 1):
@@ -214,7 +220,7 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
         headers = build_business_headers(stay_token)
         send_url = f"{settings.BASE_URL}{SEND_COIN_RED_PACKET_PATH}"
         send_payload = {
-            "roomId": stay_user_id,
+            "roomId": actual_room_id,
             "totalAmount": amount,
             "totalCount": count,
             "claimCondition": condition,
@@ -330,6 +336,9 @@ def main():
     parser.add_argument("--condition", type=int, default=2, choices=[1, 2], help="领取条件：1-拼手气，2-普通，默认2")
     parser.add_argument("--distribute-type", type=int, default=1, choices=[1, 2], help="分发类型：1-即时，2-定时，默认1")
     
+    # 房间ID参数
+    parser.add_argument("--room-id", type=str, default=None, help="房间ID，默认使用每个用户的 stayUserId")
+    
     # 抢红包控制
     parser.add_argument("--skip-receive", action="store_true", help="跳过抢红包步骤，仅发送红包（向后兼容）")
     
@@ -344,7 +353,7 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        print("没有找到可用的登录凭证，请检查 data/login_credentials.json")
+        print("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
         return
 
     if args.skip_receive:
@@ -354,7 +363,8 @@ def main():
         print(f"开始批量发送金币红包并自动抢红包（串联模式）: total={total}, workers={args.workers}, delay={args.delay}")
         task_func = execute_send_coin_and_receive
     
-    print(f"红包参数: amount={args.amount}, count={args.count}, condition={args.condition}, distribute-type={args.distribute_type}")
+    room_id_info = f", room_id={args.room_id}" if args.room_id else ", room_id=每个用户的stayUserId(默认)"
+    print(f"红包参数: amount={args.amount}, count={args.count}, condition={args.condition}, distribute-type={args.distribute_type}{room_id_info}")
 
     success_count = 0
     failures = []
@@ -374,6 +384,7 @@ def main():
                 args.retry,
                 args.retry_delay,
                 args.jitter,
+                args.room_id,
             ): cred
             for cred in credentials
         }
@@ -400,7 +411,7 @@ def main():
 
 
 # 串联模式（发金币红包 + 自动抢红包）:
-#   python batch_send_coin_red_packet.py --workers 5 --delay 0.5 --amount 20000 --count 1
+#   python batch_send_coin_red_packet.py --workers 5 --delay 0.5 --amount 20000 --count 5 --room-id 15712 
 # 仅发送模式（向后兼容）:
 #   python batch_send_coin_red_packet.py --workers 5 --delay 0.5 --amount 20000 --count 1 --skip-receive
 
