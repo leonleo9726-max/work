@@ -3,7 +3,8 @@
     "allow": [
       "Bash(.venv/Scripts/python.exe -c \"import py_compile; py_compile.compile\\('ApiAutomation/common/business_utils.py', doraise=True\\); print\\('OK business_utils'\\)\")",
       "Bash(.venv/Scripts/python.exe -c ' *)",
-      "Bash(../.venv/Scripts/python.exe -c \"from common.business_utils import is_success, get_error_details, extract_stay_red_packet_id, build_business_headers, setup_logging; print\\('imports OK'\\)\")"
+      "Bash(../.venv/Scripts/python.exe -c \"from common.business_utils import is_success, get_error_details, extract_stay_red_packet_id, build_business_headers, setup_logging; print\\('imports OK'\\)\")",
+      "Bash(git rm *)"
     ]
   }
 }

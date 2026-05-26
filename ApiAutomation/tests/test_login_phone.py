@@ -19,6 +19,7 @@ from common.api_paths import LOGIN_PHONE_PATH
 from common.auth_utils import (
     get_login_credentials_by_phone,
     load_login_credentials_from_json,
+    save_login_credentials_to_json,
     store_login_credentials,
     to_base64,
 )
@@ -289,7 +290,7 @@ def test_login_phone_api_single(request, encrypt_key):
 
     login_success = _is_login_success(response)
 
-    login_info = extract_login_info(response)
+    login_info = extract_login_user_info(response)
     if login_info:
         store_login_credentials(phone_number, login_info)
 
@@ -325,7 +326,7 @@ def test_login_phone_api_batch(request, encrypt_key, phone_number):
 
     login_success = _is_login_success(response)
 
-    login_info = extract_login_info(response)
+    login_info = extract_login_user_info(response)
     if login_info:
         store_login_credentials(phone_number, login_info)
 
@@ -372,7 +373,7 @@ if __name__ == "__main__":
     print(f"[login_phone] 登录结果: success={_is_login_success(response)}")
     
     # 提取登录信息
-    login_info = extract_login_info(response)
+    login_info = extract_login_user_info(response)
     if login_info:
         print(f"[login_phone] stayUserId={login_info['stayUserId']} stayToken={login_info['stayToken']}")
         store_login_credentials(args.phone, login_info)
