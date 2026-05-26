@@ -1,5 +1,9 @@
 import pytest
 from config import settings
+from common.business_utils import setup_logging
+
+# 会话级：初始化统一日志
+setup_logging()
 
 
 def pytest_addoption(parser):

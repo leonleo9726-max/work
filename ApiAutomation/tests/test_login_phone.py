@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success
 from config import settings
 
 LOGIN_CREDENTIALS_FILE = PROJECT_ROOT / "data" / "login_credentials.json"
@@ -89,21 +90,13 @@ def create_login_phone_params(
         "downloadChannel": None,
         "ipAddress": "41.235.64.230",
         "remoteIp": "41.235.64.230",
-        "languageCountry": "en",
-        "appLanguage": "en",
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "verificationCode": verification_code,
-        "captchaType": 0,
-        "loginPwdType": 0,
-        "password": "a123456",
+        "timezone": "Asia/Shanghai",
         "tablet": 0,
         "simulator": 0,
         "useVpn": 0,
         "useRoot": 0,
         "useDebug": 0,
         "mockLocation": 0,
-        "timezone":  "Asia/Shanghai",
         "languageCountry": "en",
         "appLanguage": "en",
         "areaCode": area_code,
@@ -133,30 +126,6 @@ def login_with_phone(payload, encrypt_key):
         timestamp=timestamp,
     )
 
-
-def _is_login_success(response):
-    """根据常见返回结构判断是否登录成功。"""
-    if not isinstance(response, dict):
-        return False
-
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-
-    data = response.get("data")
-    if isinstance(data, dict):
-        if data.get("token") or data.get("accessToken") or data.get("jwt"):
-            return True
-
-    return False
 
 
 LOGIN_CREDENTIALS = {}
@@ -222,7 +191,7 @@ def login_phone_and_store(phone_number, encrypt_key, verification_code="8888", a
     if response is None or not isinstance(response, dict):
         raise RuntimeError("登录接口返回为空或非 JSON 数据")
 
-    login_success = _is_login_success(response)
+    login_success = is_success(response)
     login_info = extract_login_user_info(response)
     if login_info:
         store_login_credentials(phone_number, login_info)
@@ -352,7 +321,7 @@ def test_login_phone_api_single(request, encrypt_key):
     assert response is not None
     assert isinstance(response, dict)
 
-    login_success = _is_login_success(response)
+    login_success = is_success(response)
 
     login_info = extract_login_user_info(response)
     if login_info:
@@ -394,7 +363,7 @@ def test_login_phone_api_batch(request, encrypt_key, phone_number):
     assert response is not None
     assert isinstance(response, dict)
 
-    login_success = _is_login_success(response)
+    login_success = is_success(response)
 
     login_info = extract_login_user_info(response)
     if login_info:
@@ -446,7 +415,7 @@ if __name__ == "__main__":
     print("[login_phone][debug] direct run mode enabled")
     response = login_with_phone(payload, settings.TEST_ENCRYPT_KEY)
     print(f"[login_phone] 响应: {response}")
-    print(f"[login_phone] 登录结果: success={_is_login_success(response)}")
+    print(f"[login_phone] 登录结果: success={is_success(response)}")
     
     # 提取登录信息
     login_info = extract_login_user_info(response)

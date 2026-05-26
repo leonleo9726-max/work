@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success, build_business_headers
 from config import settings
 
 SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
@@ -41,30 +42,7 @@ def load_login_credentials():
     print("错误: 登录凭证文件中没有找到有效的用户凭证")
     sys.exit(1)
 
-def build_business_headers(stay_token):
-    """构建业务请求头"""
-    headers = settings.build_common_encrypted_headers()
-    headers["token"] = stay_token
-    return headers
 
-def is_success(response):
-    """判断红包发送是否成功"""
-    if not isinstance(response, dict):
-        return False
-    
-    # 检查各种成功标志
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-    
-    return False
 
 def send_single_red_packet(credential, amount, count, condition, distribute_type, packet_index):
     """发送单个红包"""
@@ -135,7 +113,7 @@ def main():
     failure_count = 0
     start_time = time.time()
     
-    for i in range(1, 31):
+    for i in range(1, 101):
         try:
             success = send_single_red_packet(
                 credential, 
@@ -152,7 +130,7 @@ def main():
                 failure_count += 1
             
             # 添加延迟，避免请求过于频繁（可根据需要调整）
-            if i < 100:  # 最后一个不需要等待
+            if i < 100:
                 time.sleep(0.5)  # 0.5秒延迟
             
         except Exception as e:

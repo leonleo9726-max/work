@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import pytest
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success, get_error_details, extract_stay_red_packet_id
 from config import settings
 from tests.test_login_phone import build_business_headers_from_login
 
@@ -122,60 +123,12 @@ def send_gift_red_packet(headers, credential, gift_id=107, gift_count=7, total_a
     return response
 
 
-def extract_stay_red_packet_id(response):
-    """从发红包接口的响应中提取 stayRedPacketId
-    
-    支持多种响应结构：
-    - {"code": 0, "data": {"stayRedPacketId": "xxx"}}
-    - {"stayCode": 200, "stayResult": {"stayRedPacketId": "xxx"}}
-    - {"stayRedPacketId": "xxx"}
-    - {"data": {"stayRedPacketId": "xxx"}}
-    """
-    if not isinstance(response, dict):
-        return None
-    
-    # 尝试从 stayResult 中提取
-    stay_result = response.get("stayResult")
-    if isinstance(stay_result, dict):
-        red_packet_id = stay_result.get("stayRedPacketId")
-        if red_packet_id is not None:
-            return red_packet_id
-    
-    # 尝试从 data 中提取
-    data = response.get("data")
-    if isinstance(data, dict):
-        red_packet_id = data.get("stayRedPacketId")
-        if red_packet_id is not None:
-            return red_packet_id
-    
-    # 尝试从响应顶层提取
-    red_packet_id = response.get("stayRedPacketId")
-    if red_packet_id is not None:
-        return red_packet_id
-    
-    return None
-
 
 def check_response_success(response, context="操作"):
     """检查接口响应是否成功，失败时抛出 pytest.fail"""
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
-    
-    if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
-        pytest.fail(f"{context}失败: {error_message}, 完整响应: {response}")
-    
-    return success
+    if not is_success(response):
+        pytest.fail(f"{context}失败: {get_error_details(response)}, 完整响应: {response}")
+    return True
 
 
 @pytest.mark.api
@@ -339,10 +292,6 @@ def parse_args():
 
 def _receive_red_packet_direct(phone_number, red_packet_id):
     """直接运行模式下的抢红包函数"""
-    import sys
-    from tests.test_login_phone import build_business_headers_from_login
-    from config import settings
-    from common.http_utils import HttpUtils
     
     # 获取登录凭证
     headers, credential = build_business_headers_from_login(phone_number=phone_number)
@@ -374,13 +323,7 @@ def _receive_red_packet_direct(phone_number, red_packet_id):
     
     print(f"[直接运行] 完整响应: {response}")
     
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
+    success = is_success(response)
     
     if success:
         print(f"[直接运行] 抢红包成功")

@@ -1,12 +1,14 @@
 import sys
 import os
+import logging
 import requests
 import json
 
-# 添加项目根目录到Python路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from common.sign_utils import SignUtils
+
+_log = logging.getLogger("api_test")
 
 class HttpUtils:
     @staticmethod
@@ -22,7 +24,7 @@ class HttpUtils:
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
-            print(f"GET请求失败: {e}")
+            _log.error("GET %s 失败: %s", url, e)
             return None
     
     @staticmethod
@@ -68,5 +70,5 @@ class HttpUtils:
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
-            print(f"POST请求失败: {e}")
+            _log.error("POST %s 失败: %s", url, e)
             return None

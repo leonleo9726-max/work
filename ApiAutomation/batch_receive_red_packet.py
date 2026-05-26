@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success, get_error_details, build_business_headers, extract_stay_red_packet_id
 from config import settings
 
 
@@ -55,64 +56,7 @@ def load_login_credentials():
     return credential_list
 
 
-def build_business_headers(stay_token):
-    """构建业务请求头"""
-    headers = settings.build_common_encrypted_headers()
-    headers["token"] = stay_token
-    return headers
 
-
-def is_success(response):
-    """判断抢红包是否成功"""
-    if not isinstance(response, dict):
-        return False
-    
-    # 检查各种成功标志
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-    
-    return False
-
-
-def get_error_details(response):
-    """从响应中提取详细的错误信息"""
-    if not isinstance(response, dict):
-        return "无效的响应格式"
-    
-    error_info = []
-    
-    # 检查各种可能的错误字段
-    error_fields = [
-        "stayErrorMessage",
-        "stayMessage",
-        "errorMessage",
-        "message",
-        "msg",
-        "error"
-    ]
-    
-    for field in error_fields:
-        if field in response and response[field]:
-            error_info.append(f"{field}: {response[field]}")
-    
-    # 检查错误代码
-    code_fields = ["stayCode", "code", "errorCode"]
-    for field in code_fields:
-        if field in response:
-            error_info.append(f"{field}: {response[field]}")
-    
-    if error_info:
-        return "; ".join(error_info)
-    
-    return str(response)
 
 
 def is_red_packet_exhausted(response):
@@ -144,32 +88,6 @@ def is_already_received(response):
     
     return False
 
-
-def extract_stay_red_packet_id(response):
-    """从发红包接口的响应中提取 stayRedPacketId"""
-    if not isinstance(response, dict):
-        return None
-    
-    # 尝试从 stayResult 中提取
-    stay_result = response.get("stayResult")
-    if isinstance(stay_result, dict):
-        red_packet_id = stay_result.get("stayRedPacketId")
-        if red_packet_id is not None:
-            return red_packet_id
-    
-    # 尝试从 data 中提取
-    data = response.get("data")
-    if isinstance(data, dict):
-        red_packet_id = data.get("stayRedPacketId")
-        if red_packet_id is not None:
-            return red_packet_id
-    
-    # 尝试从响应顶层提取
-    red_packet_id = response.get("stayRedPacketId")
-    if red_packet_id is not None:
-        return red_packet_id
-    
-    return None
 
 
 def execute_receive_red_packet(credential, red_packet_id, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):

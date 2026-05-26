@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success, get_error_details
 from config import settings
 
 
@@ -92,37 +93,12 @@ def create_login_params(phone_number, unique_id, verification_code="8888", area_
     return params
 
 
-def is_success(response):
-    """判断登录是否成功"""
+def is_network_error(response):
+    """检查是否为网络不可用错误（980003000+100087），需要特殊重试处理。"""
     if not isinstance(response, dict):
         return False
-    
-    # 检查特定的网络错误代码
-    stay_code = response.get("stayCode")
-    if stay_code == 980003000:  # 网络错误代码
-        error_msg = response.get("stayErrorMessage", "")
-        if "100087" in str(error_msg):
-            # 这是网络不可用错误，需要重试
-            return False
-    
-    if stay_code in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-    
-    code = response.get("code")
-    if code in (0, "0", 200, "200"):
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-    
-    data = response.get("data")
-    if isinstance(data, dict) and (data.get("token") or data.get("accessToken") or data.get("jwt")):
-        return True
-    
-    return False
+    return (response.get("stayCode") == 980003000
+            and "100087" in str(response.get("stayErrorMessage", "")))
 
 
 def extract_login_info(response):
@@ -150,38 +126,6 @@ def extract_login_info(response):
     return None
 
 
-def get_error_details(response):
-    """从响应中提取详细的错误信息"""
-    if not isinstance(response, dict):
-        return "无效的响应格式"
-    
-    error_info = []
-    
-    # 检查各种可能的错误字段
-    error_fields = [
-        "stayErrorMessage",
-        "stayMessage",
-        "errorMessage",
-        "message",
-        "msg",
-        "error"
-    ]
-    
-    for field in error_fields:
-        if field in response and response[field]:
-            error_info.append(f"{field}: {response[field]}")
-    
-    # 检查错误代码
-    code_fields = ["stayCode", "code", "errorCode"]
-    for field in code_fields:
-        if field in response:
-            error_info.append(f"{field}: {response[field]}")
-    
-    if error_info:
-        return "; ".join(error_info)
-    
-    return str(response)
-
 
 def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
     """执行单个登录任务"""
@@ -208,7 +152,7 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
             encrypt_key=encrypt_key,
         )
 
-        if is_success(login_response):
+        if not is_network_error(login_response) and is_success(login_response):
             login_info = extract_login_info(login_response)
             if verbose:
                 if login_info:
@@ -236,18 +180,13 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
         }
         
         # 检查是否是网络错误，如果是则增加重试延迟
-        is_network_error = False
-        if isinstance(login_response, dict):
-            stay_code = login_response.get("stayCode")
-            error_msg = login_response.get("stayErrorMessage", "")
-            if stay_code == 980003000 and "100087" in str(error_msg):
-                is_network_error = True
-                if verbose:
-                    print(f"  [网络错误 100087] 将在重试前等待更长时间")
+        network_error = is_network_error(login_response)
+        if network_error and verbose:
+            print(f"  [网络错误 100087] 将在重试前等待更长时间")
         
         if attempt < retry:
             # 如果是网络错误，增加重试延迟
-            extra_delay = 2.0 if is_network_error else 0.0
+            extra_delay = 2.0 if network_error else 0.0
             actual_retry_delay = retry_delay * (1 + random.uniform(-jitter, jitter)) + extra_delay
             time.sleep(max(0.5, actual_retry_delay))
 

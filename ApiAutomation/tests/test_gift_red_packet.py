@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import pytest
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success, get_error_details
 from config import settings
 from tests.test_login_phone import build_business_headers_from_login
 
@@ -83,21 +84,10 @@ def test_send_gift_red_packet(request, phone_number, room_id, gift_id, gift_coun
     response = send_gift_red_packet(headers, credential, payload)
 
     # 检查响应是否成功
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
+    success = is_success(response)
 
     if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+        error_message = get_error_details(response)
         pytest.fail(f"发送礼物红包失败: {error_message}, 完整响应: {response}")
 
     print(f"[send_gift_red_packet] 用户 {credential['stayUserId']} 发送礼物红包成功，参数: {payload}，响应: {response}")
@@ -147,20 +137,9 @@ def test_login_then_send_gift_red_packet(request, encrypt_key):
     assert response is not None, "发送礼物红包接口未返回有效响应"
     assert isinstance(response, dict), "发送礼物红包接口返回值应为 JSON 对象"
 
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
+    success = is_success(response)
     if not success:
-        error_message = (
-            response.get("message")
-            or response.get("errorMessage")
-            or response.get("msg")
-            or "未知错误"
-        )
+        error_message = get_error_details(response)
         pytest.fail(f"登录并发送礼物红包失败: {error_message}, 响应: {response}")
 
     print(f"[login_then_send_gift] 用户 {credential['stayUserId']} 登录并发送礼物红包成功，响应: {response}")
@@ -208,13 +187,7 @@ def test_batch_send_gift_red_packets(request):
             assert response is not None, f"用户 {phone} 发送礼物红包接口未返回有效响应"
             assert isinstance(response, dict), f"用户 {phone} 发送礼物红包接口返回值应为 JSON 对象"
 
-            success = (
-                response.get("code") == 0
-                or response.get("stayCode") == 200
-                or response.get("stayIsSuccess") is True
-                or response.get("success") is True
-                or response.get("status") == "success"
-            )
+            success = is_success(response)
 
             if success:
                 results[phone] = {"success": True, "response": response}
@@ -269,10 +242,6 @@ def parse_args():
 
 def _send_gift_red_packet_direct(phone_number, room_id, gift_id, gift_count, total_amount, total_count, claim_condition, distribute_type):
     """直接运行模式下的礼物红包发送函数"""
-    import sys
-    from tests.test_login_phone import build_business_headers_from_login
-    from config import settings
-    from common.http_utils import HttpUtils
     
     # 获取登录凭证
     headers, credential = build_business_headers_from_login(phone_number=phone_number)
@@ -313,13 +282,7 @@ def _send_gift_red_packet_direct(phone_number, room_id, gift_id, gift_count, tot
     
     print(f"[直接运行] 完整响应: {response}")
     
-    success = (
-        response.get("code") == 0
-        or response.get("stayCode") == 200
-        or response.get("stayIsSuccess") is True
-        or response.get("success") is True
-        or response.get("status") == "success"
-    )
+    success = is_success(response)
     
     if success:
         print(f"[直接运行] 礼物红包发送成功")

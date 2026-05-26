@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success, get_error_details, build_business_headers
 from config import settings
 
 
@@ -42,64 +43,7 @@ def load_login_credentials():
     return credential_list
 
 
-def build_business_headers(stay_token):
-    """构建业务请求头"""
-    headers = settings.build_common_encrypted_headers()
-    headers["token"] = stay_token
-    return headers
 
-
-def is_success(response):
-    """判断礼物发送是否成功"""
-    if not isinstance(response, dict):
-        return False
-
-    # 检查各种成功标志
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-
-    return False
-
-
-def get_error_details(response):
-    """从响应中提取详细的错误信息"""
-    if not isinstance(response, dict):
-        return "无效的响应格式"
-
-    error_info = []
-
-    # 检查各种可能的错误字段
-    error_fields = [
-        "stayErrorMessage",
-        "stayMessage",
-        "errorMessage",
-        "message",
-        "msg",
-        "error"
-    ]
-
-    for field in error_fields:
-        if field in response and response[field]:
-            error_info.append(f"{field}: {response[field]}")
-
-    # 检查错误代码
-    code_fields = ["stayCode", "code", "errorCode"]
-    for field in code_fields:
-        if field in response:
-            error_info.append(f"{field}: {response[field]}")
-
-    if error_info:
-        return "; ".join(error_info)
-
-    return str(response)
 
 
 def execute_send_gift(credential, recipients, gift_id, count, source_type, object_id, room_id, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):

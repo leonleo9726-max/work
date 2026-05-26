@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.http_utils import HttpUtils
+from common.business_utils import is_success
 from config import settings
 
 
@@ -98,24 +99,6 @@ def create_register_params(phone_number, unique_id, verification_code="8888", ar
     }
     return params
 
-
-def is_success(response):
-    if not isinstance(response, dict):
-        return False
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-    data = response.get("data")
-    if isinstance(data, dict) and (data.get("token") or data.get("accessToken") or data.get("jwt")):
-        return True
-    return False
 
 
 def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, retry_delay=1.0):

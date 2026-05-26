@@ -19,9 +19,11 @@ SEND_CODE_PATH = "/user/stay/send-code"
 REGISTER_PATH = "/user/stay/login/phone"
 LOGIN_PHONE_PATH = "/user/stay/login/password"
 
-LOGIN_USER_INFO = "1101656%2C116724380944632386574%2C%2C%2C-1%2Cnull%2C1%2C-1"
+# Login-related defaults — populated at runtime or via env vars.
+# These are examples only; production credentials must come from secure storage.
+LOGIN_USER_INFO = ""
 LOGIN_LANGUAGE_CODE = "en"
-LOGIN_TOKEN = "iOaCQ0AXv5hFeLk75Jng8mXOnurm+FHeQ0u6qOsmiHLwfLck5DcXLzCyElXO67UakUgYRlGcfiX6VHGNIaLyOg=="
+LOGIN_TOKEN = ""
 LOGIN_PLATFORM = "android"
 
 
