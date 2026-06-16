@@ -172,31 +172,32 @@ class HttpUtils:
         """发送POST请求（使用连接池）"""
         try:
             session = cls.get_session()
+            request_headers = headers.copy() if headers else {}
 
             # 如果需要加密
             if encrypt_key and data:
+                payload = SignUtils.filter_empty_values(data)
+
                 # 生成签名
                 if not timestamp:
                     timestamp = str(int(time.time() * 1000))
 
-                sign = SignUtils.generate_sign(data, locale, timestamp, encrypt_key)
+                sign = SignUtils.generate_sign(payload, locale, timestamp, encrypt_key)
 
                 # 加密数据
-                encrypted_data = SignUtils.encrypt(data, encrypt_key)
+                encrypted_data = SignUtils.encrypt(payload, encrypt_key)
 
                 # 更新headers
-                if headers is None:
-                    headers = {}
-                headers['content-type'] = 'application/json'
-                headers['locale'] = locale
-                headers['timestamp'] = timestamp
-                headers['sign'] = sign
+                request_headers['content-type'] = 'application/json'
+                request_headers['locale'] = locale
+                request_headers['timestamp'] = timestamp
+                request_headers['sign'] = sign
 
                 # 发送加密数据
                 response = session.post(
                     url=url,
                     data=encrypted_data,
-                    headers=headers,
+                    headers=request_headers,
                     timeout=cls.TIMEOUT,
                 )
             else:
@@ -204,7 +205,7 @@ class HttpUtils:
                 response = session.post(
                     url=url,
                     json=data,
-                    headers=headers,
+                    headers=request_headers,
                     timeout=cls.TIMEOUT,
                 )
 

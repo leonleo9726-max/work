@@ -20,8 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.api
-def test_business_api_with_login_json():
+def test_business_api_with_login_json(request):
     """示例：从 login_credentials.json 读取登录凭证，调用后续业务接口。"""
+    if not request.config.getoption("--run-api"):
+        pytest.skip("need --run-api option to execute real API tests")
+
     phone_number = "15200711073"
 
     headers, credential = build_business_headers_from_login(phone_number=phone_number)

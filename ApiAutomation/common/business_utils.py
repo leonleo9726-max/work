@@ -3,42 +3,23 @@
 import json
 import logging
 from config import settings
+from common.response_utils import (
+    extract_error_details as _extract_error_details,
+    extract_stay_red_packet_id as _extract_stay_red_packet_id,
+    is_api_success,
+)
 
 _log = logging.getLogger("api_test")
 
 
 def is_success(response):
     """判断接口响应是否成功"""
-    if not isinstance(response, dict):
-        return False
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-    data = response.get("data")
-    if isinstance(data, dict) and (data.get("token") or data.get("accessToken") or data.get("jwt")):
-        return True
-    return False
+    return is_api_success(response)
 
 
 def get_error_details(response):
     """从响应中提取错误信息"""
-    if not isinstance(response, dict):
-        return "无效的响应格式"
-    parts = []
-    for field in ("stayErrorMessage", "stayMessage", "errorMessage", "message", "msg", "error"):
-        if response.get(field):
-            parts.append(f"{field}: {response[field]}")
-    for field in ("stayCode", "code", "errorCode"):
-        if field in response:
-            parts.append(f"{field}: {response[field]}")
-    return "; ".join(parts) if parts else str(response)
+    return _extract_error_details(response)
 
 
 def build_business_headers(stay_token):
@@ -50,14 +31,7 @@ def build_business_headers(stay_token):
 
 def extract_stay_red_packet_id(response):
     """从发红包接口响应中提取 stayRedPacketId"""
-    if not isinstance(response, dict):
-        return None
-    for container in (response.get("stayResult"), response.get("data"), response):
-        if isinstance(container, dict):
-            rid = container.get("stayRedPacketId")
-            if rid is not None:
-                return rid
-    return None
+    return _extract_stay_red_packet_id(response)
 
 
 def check_success_or_fail(response, context="操作"):

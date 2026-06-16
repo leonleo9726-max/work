@@ -13,7 +13,18 @@ class SignUtils:
     def filter_empty_values(data):
         """过滤空值"""
         if isinstance(data, dict):
-            return {k: v for k, v in data.items() if v is not None and v != '' and v != [] and v != {}}
+            result = {}
+            for key, value in data.items():
+                cleaned = SignUtils.filter_empty_values(value)
+                if cleaned is not None and cleaned != '' and cleaned != [] and cleaned != {}:
+                    result[key] = cleaned
+            return result
+        if isinstance(data, list):
+            return [
+                item
+                for item in (SignUtils.filter_empty_values(value) for value in data)
+                if item is not None and item != '' and item != [] and item != {}
+            ]
         return data
     
     @staticmethod

@@ -235,8 +235,11 @@ def print_allocation_statistics():
 
 @pytest.mark.api
 @pytest.mark.parametrize("test_case", TEST_CASES, ids=lambda x: f"phone={x['phone_number']}")
-def test_send_code_api(test_case, encrypt_key):
+def test_send_code_api(request, test_case, encrypt_key):
     """测试发送验证码API，手机号随机匹配uniqueId"""
+    if not request.config.getoption("--run-api"):
+        pytest.skip("need --run-api option to execute real API tests")
+
     if test_case['phone_number'] == TEST_CASES[0]['phone_number']:
         print_allocation_statistics()
 
@@ -255,8 +258,11 @@ def test_send_code_api(test_case, encrypt_key):
 
 @pytest.mark.api
 @pytest.mark.parametrize("test_case", TEST_CASES, ids=lambda x: f"phone={x['phone_number']}")
-def test_register_api(test_case, encrypt_key):
+def test_register_api(request, test_case, encrypt_key):
     """测试注册API，手机号随机匹配uniqueId"""
+    if not request.config.getoption("--run-api"):
+        pytest.skip("need --run-api option to execute real API tests")
+
     # 发送验证码
     send_code_params = create_send_code_params(
         phone_number=test_case['phone_number'],

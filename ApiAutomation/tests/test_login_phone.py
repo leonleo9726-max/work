@@ -14,16 +14,12 @@ from pathlib import Path
 
 import pytest
 
-# conftest.py 已处理 sys.path，此处不再需要
-from common.api_paths import LOGIN_PHONE_PATH
 from common.auth_utils import (
-    get_login_credentials_by_phone,
-    load_login_credentials_from_json,
-    save_login_credentials_to_json,
+    create_login_phone_params,
+    login_with_phone,
     store_login_credentials,
-    to_base64,
 )
-from common.http_utils import HttpUtils
+from common.response_utils import extract_login_info, is_api_success
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -68,182 +64,14 @@ def load_phones_from_csv():
 PHONE_CASES = load_phones_from_csv()
 
 
-def create_login_phone_params(
-    phone_number="15200711073",
-    verification_code="8888",
-    area_code="86",
-    **kwargs,
-):
-    """创建登录参数，统一对齐项目加密请求字段。"""
-    params = {
-        "platformType": 0,
-        "appType": 0,
-        "variantType": 0,
-        "appVersion": "2.1.4",
-        "buildVersion": 317,
-        "osModel": "V2278A",
-        "osVersion": "13",
-        "language": "en",
-        "uniqueId": "bac1131e82cd4c738e3199375ffe77b4",
-        "uuid": "9fcd8047c27442138fdbdcddcb026ebd",
-        "deviceId": "be825900787d419f9872eed48566f45c",
-        "widevineId": None,
-        "idfv": None,
-        "idfa": None,
-        "mcc": None,
-        "mnc": None,
-        "networkName": None,
-        "inviteCode": None,
-        "downloadChannel": None,
-        "ipAddress": "41.235.64.230",
-        "remoteIp": "41.235.64.230",
-        "timezone": "Asia/Shanghai",
-        "tablet": 0,
-        "simulator": 0,
-        "useVpn": 0,
-        "useRoot": 0,
-        "useDebug": 0,
-        "mockLocation": 0,
-        "timezone":  "Asia/Shanghai",
-        "languageCountry": "en",
-        "appLanguage": "en",
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "password": "a123456",
-        "verificationCode": verification_code,
-        "captchaType": 0,
-        "loginPwdType": 0,
-    }
-    params.update(kwargs)
-    params["password"] = to_base64(params.get("password"))
-    return params
-
-
-def login_with_phone(payload, encrypt_key):
-    """调用手机登录接口（统一使用一种 header 模式）。"""
-    locale = str(payload.get("language", "en"))
-    timestamp = str(int(time.time() * 1000))
-    url = f"{settings.BASE_URL}{LOGIN_PHONE_PATH}"
-    headers = settings.build_common_encrypted_headers()
-    return HttpUtils.post(
-        url=url,
-        data=payload,
-        headers=headers,
-        encrypt_key=encrypt_key,
-        locale=locale,
-        timestamp=timestamp,
-    )
-
-
 def _is_login_success(response):
     """根据常见返回结构判断是否登录成功。"""
-    if not isinstance(response, dict):
-        return False
-
-    if response.get("stayCode") in (0, "0", 200, "200"):
-        return True
-    if response.get("stayIsSuccess") is True:
-        return True
-
-    if response.get("code") in (0, "0", 200, "200"):
-        return True
-    if response.get("success") is True:
-        return True
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
-
-    data = response.get("data")
-    if isinstance(data, dict):
-        if data.get("token") or data.get("accessToken") or data.get("jwt"):
-            return True
-
-    return False
-
-
-LOGIN_CREDENTIALS = {}
+    return is_api_success(response)
 
 
 def extract_login_user_info(response):
     """从登录响应中提取 stayUserId 和 stayToken。"""
-    if not isinstance(response, dict):
-        return None
-
-    candidates = []
-    if isinstance(response.get("stayResult"), dict):
-        candidates.append(response["stayResult"])
-    if isinstance(response.get("data"), dict):
-        candidates.append(response["data"])
-    candidates.append(response)
-
-    for data in candidates:
-        if not isinstance(data, dict):
-            continue
-        stay_user_id = data.get("stayUserId")
-        stay_token = data.get("stayToken")
-        if stay_user_id and stay_token:
-            return {
-                "stayUserId": str(stay_user_id),
-                "stayToken": str(stay_token),
-            }
-    return None
-
-
-def store_login_credentials(phone_number, login_info):
-    """存储登录凭证，保证 stayUserId 与 stayToken 一一对应。"""
-    if not login_info:
-        return
-
-    user_id = login_info["stayUserId"]
-    token = login_info["stayToken"]
-
-    existing = LOGIN_CREDENTIALS.get(user_id)
-    if existing and existing["stayToken"] != token:
-        raise AssertionError(
-            f"用户ID {user_id} 已存在不同 token：{existing['stayToken']} vs {token}"
-        )
-
-    LOGIN_CREDENTIALS[user_id] = {
-        "phone_number": phone_number,
-        "stayUserId": user_id,
-        "stayToken": token,
-    }
-    save_login_credentials_to_json()
-
-
-def login_phone_and_store(phone_number, encrypt_key, verification_code="8888", area_code="86", **kwargs):
-    """执行登录并存储登录凭证。"""
-    payload = create_login_phone_params(
-        phone_number=phone_number,
-        verification_code=verification_code,
-        area_code=area_code,
-        **kwargs,
-    )
-    response = login_with_phone(payload, encrypt_key)
-
-    if response is None or not isinstance(response, dict):
-        raise RuntimeError("登录接口返回为空或非 JSON 数据")
-
-    login_success = _is_login_success(response)
-    login_info = extract_login_user_info(response)
-    if login_info:
-        store_login_credentials(phone_number, login_info)
-
-    if not login_success:
-        from common.response_utils import extract_error_message
-        error_message = extract_error_message(response)
-        raise RuntimeError(
-            f"登录失败: phone={phone_number}, message={error_message}, response={response}"
-        )
-
-    return get_login_credentials_by_phone(phone_number)
-
-
-def ensure_login_credentials(phone_number, encrypt_key):
-    """确保存在指定手机号的登录凭证，必要时执行登录。"""
-    credential = get_login_credentials_by_phone(phone_number)
-    if credential:
-        return credential
-    return login_phone_and_store(phone_number, encrypt_key)
+    return extract_login_info(response)
 
 
 def test_create_login_phone_params_contains_required_fields():

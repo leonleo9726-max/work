@@ -7,9 +7,12 @@
 
 import json
 import base64
+import time
 from pathlib import Path
 from typing import Optional
 
+from common.api_paths import LOGIN_PHONE_PATH
+from common.response_utils import extract_error_message, extract_login_info, is_api_success
 from config import settings
 
 # 项目根目录（此文件位于 ApiAutomation/common/，向上两级）
@@ -166,6 +169,122 @@ def build_business_headers_from_login(
 
     headers = build_business_headers(credential["stayToken"])
     return headers, credential
+
+
+# ============================================================
+# 登录接口与凭证自动补全
+# ============================================================
+
+
+def create_login_phone_params(
+    phone_number: str = "15200711073",
+    verification_code: str = "8888",
+    area_code: str = "86",
+    **kwargs,
+) -> dict:
+    """创建手机号密码登录参数。"""
+    params = {
+        "platformType": 0,
+        "appType": 0,
+        "variantType": 0,
+        "appVersion": "2.1.4",
+        "buildVersion": 317,
+        "osModel": "V2278A",
+        "osVersion": "13",
+        "language": "en",
+        "uniqueId": "bac1131e82cd4c738e3199375ffe77b4",
+        "uuid": "9fcd8047c27442138fdbdcddcb026ebd",
+        "deviceId": "be825900787d419f9872eed48566f45c",
+        "widevineId": None,
+        "idfv": None,
+        "idfa": None,
+        "mcc": None,
+        "mnc": None,
+        "networkName": None,
+        "inviteCode": None,
+        "downloadChannel": None,
+        "ipAddress": "41.235.64.230",
+        "remoteIp": "41.235.64.230",
+        "timezone": "Asia/Shanghai",
+        "tablet": 0,
+        "simulator": 0,
+        "useVpn": 0,
+        "useRoot": 0,
+        "useDebug": 0,
+        "mockLocation": 0,
+        "languageCountry": "en",
+        "appLanguage": "en",
+        "areaCode": area_code,
+        "phoneNumber": phone_number,
+        "password": "a123456",
+        "verificationCode": verification_code,
+        "captchaType": 0,
+        "loginPwdType": 0,
+    }
+    params.update(kwargs)
+    params["password"] = to_base64(params.get("password"))
+    return params
+
+
+def login_with_phone(payload: dict, encrypt_key: str) -> Optional[dict]:
+    """调用手机号密码登录接口。"""
+    from common.http_utils import HttpUtils
+
+    locale = str(payload.get("language", "en"))
+    timestamp = str(int(time.time() * 1000))
+    url = f"{settings.BASE_URL}{LOGIN_PHONE_PATH}"
+    headers = settings.build_common_encrypted_headers()
+    return HttpUtils.post(
+        url=url,
+        data=payload,
+        headers=headers,
+        encrypt_key=encrypt_key,
+        locale=locale,
+        timestamp=timestamp,
+    )
+
+
+def login_phone_and_store(
+    phone_number: str,
+    encrypt_key: str,
+    verification_code: str = "8888",
+    area_code: str = "86",
+    **kwargs,
+) -> dict:
+    """执行登录并持久化登录凭证。"""
+    payload = create_login_phone_params(
+        phone_number=phone_number,
+        verification_code=verification_code,
+        area_code=area_code,
+        **kwargs,
+    )
+    response = login_with_phone(payload, encrypt_key)
+
+    if response is None or not isinstance(response, dict):
+        raise RuntimeError("登录接口返回为空或非 JSON 数据")
+
+    login_info = extract_login_info(response)
+    if login_info:
+        store_login_credentials(phone_number, login_info)
+
+    if not is_api_success(response):
+        error_message = extract_error_message(response)
+        raise RuntimeError(
+            f"登录失败: phone={phone_number}, message={error_message}, response={response}"
+        )
+
+    credential = get_login_credentials_by_phone(phone_number)
+    if credential is None:
+        raise RuntimeError(f"登录成功但未提取到凭证: phone={phone_number}, response={response}")
+    return credential
+
+
+def ensure_login_credentials(phone_number: str, encrypt_key: str) -> dict:
+    """确保存在指定手机号的登录凭证，必要时自动登录。"""
+    credential = get_login_credentials_by_phone(phone_number)
+    if credential:
+        return credential
+    return login_phone_and_store(phone_number, encrypt_key)
 
 
 # ============================================================
