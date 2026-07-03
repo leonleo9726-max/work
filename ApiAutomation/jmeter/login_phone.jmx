@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="EastPoint Login Phone">
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="protocol" elementType="Argument">
+            <stringProp name="Argument.name">protocol</stringProp>
+            <stringProp name="Argument.value">${__P(protocol,https)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="host" elementType="Argument">
+            <stringProp name="Argument.name">host</stringProp>
+            <stringProp name="Argument.value">${__P(host,api.eastpointtest.com)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="loginPath" elementType="Argument">
+            <stringProp name="Argument.name">loginPath</stringProp>
+            <stringProp name="Argument.value">${__P(loginPath,/user/stay/login/password)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="encryptKey" elementType="Argument">
+            <stringProp name="Argument.name">encryptKey</stringProp>
+            <stringProp name="Argument.value">${__P(encryptKey,kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="phone" elementType="Argument">
+            <stringProp name="Argument.name">phone</stringProp>
+            <stringProp name="Argument.value">${__P(phone,15200711073)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="verificationCode" elementType="Argument">
+            <stringProp name="Argument.name">verificationCode</stringProp>
+            <stringProp name="Argument.value">${__P(code,8888)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="areaCode" elementType="Argument">
+            <stringProp name="Argument.name">areaCode</stringProp>
+            <stringProp name="Argument.value">${__P(area,86)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="plainPassword" elementType="Argument">
+            <stringProp name="Argument.name">plainPassword</stringProp>
+            <stringProp name="Argument.value">${__P(password,a123456)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Login Phone CSV Batch">
+        <intProp name="ThreadGroup.num_threads">1</intProp>
+        <intProp name="ThreadGroup.ramp_time">1</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+          <intProp name="LoopController.loops">-1</intProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data Set - login_phone.csv">
+          <stringProp name="filename">${__P(csvFile,E:/python/work/ApiAutomation/data/login_phone.csv)}</stringProp>
+          <stringProp name="fileEncoding">UTF-8</stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <boolProp name="ignoreFirstLine">false</boolProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">false</boolProp>
+          <boolProp name="stopThread">true</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+        </CSVDataSet>
+        <hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP Header Manager">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">content-type</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">locale</stringProp>
+              <stringProp name="Header.value">${locale}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">timestamp</stringProp>
+              <stringProp name="Header.value">${timestamp}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">sign</stringProp>
+              <stringProp name="Header.value">${sign}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">appLanguage</stringProp>
+              <stringProp name="Header.value">en</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">app-language</stringProp>
+              <stringProp name="Header.value">en</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">app-type</stringProp>
+              <stringProp name="Header.value">0</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">content-sign</stringProp>
+              <stringProp name="Header.value">sat1</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">content-status</stringProp>
+              <stringProp name="Header.value">1</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">platform-type</stringProp>
+              <stringProp name="Header.value">0</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">variant-type</stringProp>
+              <stringProp name="Header.value">0</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">build-version</stringProp>
+              <stringProp name="Header.value">317</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /user/stay/login/password">
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <boolProp name="HTTPArgument.use_equals">false</boolProp>
+                <stringProp name="Argument.value">${encryptedBody}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port"></stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${loginPath}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Build encrypted login request">
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="script"><![CDATA[
+import groovy.json.JsonOutput
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import java.security.MessageDigest
+import java.util.Base64
+
+String encryptKey = vars.get('encryptKey')
+String iv = 'O6xlNQ4e5oRTVZSu'
+
+String phoneNumber = vars.get('phone_number')
+if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+    phoneNumber = vars.get('phone') ?: '15200711073'
+}
+phoneNumber = phoneNumber.trim()
+
+String areaCode = vars.get('areaCode') ?: '86'
+String verificationCode = vars.get('verificationCode') ?: '8888'
+String plainPassword = vars.get('plainPassword') ?: 'a123456'
+String encodedPassword = Base64.encoder.encodeToString(plainPassword.getBytes('UTF-8'))
+
+def filterEmpty
+filterEmpty = { obj ->
+    if (obj instanceof Map) {
+        def result = new LinkedHashMap()
+        obj.each { key, value ->
+            def cleaned = filterEmpty(value)
+            if (cleaned != null && cleaned != '' && cleaned != [] && cleaned != [:]) {
+                result[key] = cleaned
+            }
+        }
+        return result
+    }
+    if (obj instanceof List) {
+        return obj.collect { filterEmpty(it) }
+            .findAll { it != null && it != '' && it != [] && it != [:] }
+    }
+    return obj
+}
+
+def transformSignKeys = { Map data ->
+    def result = new LinkedHashMap()
+    data.each { key, value ->
+        String newKey
+        if (key.startsWith('stay')) {
+            newKey = key.substring(4)
+            if (newKey) {
+                newKey = newKey[0].toLowerCase() + newKey.substring(1)
+            }
+        } else {
+            newKey = key ? key[0].toLowerCase() + key.substring(1) : key
+        }
+        result[newKey] = value
+    }
+    return result
+}
+
+def sha256 = { String text ->
+    MessageDigest md = MessageDigest.getInstance('SHA-256')
+    return md.digest(text.getBytes('UTF-8')).collect { String.format('%02x', it) }.join()
+}
+
+def aesEncrypt = { Map data ->
+    String json = JsonOutput.toJson(filterEmpty(data))
+    byte[] base64Json = Base64.encoder.encode(json.getBytes('UTF-8'))
+
+    Cipher cipher = Cipher.getInstance('AES/CBC/PKCS5Padding')
+    SecretKeySpec keySpec = new SecretKeySpec(encryptKey.getBytes('UTF-8'), 'AES')
+    IvParameterSpec ivSpec = new IvParameterSpec(iv.getBytes('UTF-8'))
+    cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
+
+    return Base64.encoder.encodeToString(cipher.doFinal(base64Json))
+}
+
+def payload = new LinkedHashMap()
+payload.platformType = 0
+payload.appType = 0
+payload.variantType = 0
+payload.appVersion = '2.1.4'
+payload.buildVersion = 317
+payload.osModel = 'V2278A'
+payload.osVersion = '13'
+payload.language = 'en'
+payload.uniqueId = 'bac1131e82cd4c738e3199375ffe77b4'
+payload.uuid = '9fcd8047c27442138fdbdcddcb026ebd'
+payload.deviceId = 'be825900787d419f9872eed48566f45c'
+payload.widevineId = null
+payload.idfv = null
+payload.idfa = null
+payload.mcc = null
+payload.mnc = null
+payload.networkName = null
+payload.inviteCode = null
+payload.downloadChannel = null
+payload.ipAddress = '41.235.64.230'
+payload.remoteIp = '41.235.64.230'
+payload.timezone = 'Asia/Shanghai'
+payload.tablet = 0
+payload.simulator = 0
+payload.useVpn = 0
+payload.useRoot = 0
+payload.useDebug = 0
+payload.mockLocation = 0
+payload.languageCountry = 'en'
+payload.appLanguage = 'en'
+payload.areaCode = areaCode
+payload.phoneNumber = phoneNumber
+payload.password = encodedPassword
+payload.verificationCode = verificationCode
+payload.captchaType = 0
+payload.loginPwdType = 0
+
+payload = filterEmpty(payload)
+
+String locale = String.valueOf(payload.language ?: 'en')
+String timestamp = String.valueOf(System.currentTimeMillis())
+def signData = filterEmpty(transformSignKeys(payload))
+String signSource = JsonOutput.toJson(signData)
+String signString = "${signSource}&locale=${locale}&timestamp=${timestamp}${encryptKey}"
+String sign = sha256(signString)
+String encryptedBody = aesEncrypt(payload)
+
+vars.put('phone_number', phoneNumber)
+vars.put('locale', locale)
+vars.put('timestamp', timestamp)
+vars.put('sign', sign)
+vars.put('encryptedBody', encryptedBody)
+vars.put('plainPayload', JsonOutput.toJson(payload))
+vars.put('signSource', signSource)
+]]></stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Assert login success and extract credentials">
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="script"><![CDATA[
+import groovy.json.JsonSlurper
+
+String responseText = prev.getResponseDataAsString()
+def response
+try {
+    response = new JsonSlurper().parseText(responseText)
+} catch (Exception e) {
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage("响应不是 JSON: " + responseText)
+    return
+}
+
+def codeOk = { value ->
+    value in [0, '0', 200, '200']
+}
+
+boolean success = false
+if (response instanceof Map) {
+    success = codeOk(response.stayCode) ||
+        response.stayIsSuccess == true ||
+        codeOk(response.code) ||
+        response.success == true ||
+        response.status in ['success', 'ok', 'SUCCESS', 'OK']
+
+    if (!success && response.data instanceof Map) {
+        success = response.data.token || response.data.accessToken || response.data.jwt
+    }
+
+    def candidates = []
+    if (response.stayResult instanceof Map) {
+        candidates << response.stayResult
+    }
+    if (response.data instanceof Map) {
+        candidates << response.data
+    }
+    candidates << response
+
+    candidates.find { item ->
+        if (item instanceof Map && item.stayUserId && item.stayToken) {
+            vars.put('stayUserId', String.valueOf(item.stayUserId))
+            vars.put('stayToken', String.valueOf(item.stayToken))
+            return true
+        }
+        return false
+    }
+}
+
+vars.put('loginSuccess', String.valueOf(success))
+
+if (!success) {
+    def message = response.stayErrorMessage ?: response.stayMessage ?: response.errorMessage ?: response.message ?: response.msg ?: response.error ?: '未知错误'
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage("登录失败: phone=${vars.get('phone_number')}, message=${message}, response=${responseText}")
+}
+]]></stringProp>
+          </JSR223Assertion>
+          <hashTree/>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Pacing 2s">
+            <stringProp name="ConstantTimer.delay">2000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <idleTime>true</idleTime>
+              <connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

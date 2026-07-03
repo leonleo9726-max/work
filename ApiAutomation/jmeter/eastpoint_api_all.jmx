@@ -1,0 +1,703 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="EastPoint API All">
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="scenario" elementType="Argument"><stringProp name="Argument.name">scenario</stringProp><stringProp name="Argument.value">${__P(scenario,login_batch)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="protocol" elementType="Argument"><stringProp name="Argument.name">protocol</stringProp><stringProp name="Argument.value">${__P(protocol,https)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="host" elementType="Argument"><stringProp name="Argument.name">host</stringProp><stringProp name="Argument.value">${__P(host,api.eastpointtest.com)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="projectRoot" elementType="Argument"><stringProp name="Argument.name">projectRoot</stringProp><stringProp name="Argument.value">${__P(projectRoot,E:/python/work/ApiAutomation)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="encryptKey" elementType="Argument"><stringProp name="Argument.name">encryptKey</stringProp><stringProp name="Argument.value">${__P(encryptKey,kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="loginCsv" elementType="Argument"><stringProp name="Argument.name">loginCsv</stringProp><stringProp name="Argument.value">${__P(loginCsv,E:/python/work/ApiAutomation/data/login_phone.csv)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="registerCsv" elementType="Argument"><stringProp name="Argument.name">registerCsv</stringProp><stringProp name="Argument.value">${__P(registerCsv,E:/python/work/ApiAutomation/data/register_phone.csv)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="deviceCsv" elementType="Argument"><stringProp name="Argument.name">deviceCsv</stringProp><stringProp name="Argument.value">${__P(deviceCsv,E:/python/work/ApiAutomation/data/device_ids.csv)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="batchCredentialsJson" elementType="Argument"><stringProp name="Argument.name">batchCredentialsJson</stringProp><stringProp name="Argument.value">${__P(batchCredentialsJson,E:/python/work/ApiAutomation/data/batch_login_credentials.json)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="credentialsJson" elementType="Argument"><stringProp name="Argument.name">credentialsJson</stringProp><stringProp name="Argument.value">${__P(credentialsJson,E:/python/work/ApiAutomation/data/login_credentials.json)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="phone" elementType="Argument"><stringProp name="Argument.name">phone</stringProp><stringProp name="Argument.value">${__P(phone,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="uniqueId" elementType="Argument"><stringProp name="Argument.name">uniqueId</stringProp><stringProp name="Argument.value">${__P(uniqueId,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="areaCode" elementType="Argument"><stringProp name="Argument.name">areaCode</stringProp><stringProp name="Argument.value">${__P(area,86)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="verificationCode" elementType="Argument"><stringProp name="Argument.name">verificationCode</stringProp><stringProp name="Argument.value">${__P(code,8888)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="plainPassword" elementType="Argument"><stringProp name="Argument.name">plainPassword</stringProp><stringProp name="Argument.value">${__P(password,a123456)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="redPacketId" elementType="Argument"><stringProp name="Argument.name">redPacketId</stringProp><stringProp name="Argument.value">${__P(redPacketId,1)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="amount" elementType="Argument"><stringProp name="Argument.name">amount</stringProp><stringProp name="Argument.value">${__P(amount,20000)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="coinCount" elementType="Argument"><stringProp name="Argument.name">coinCount</stringProp><stringProp name="Argument.value">${__P(count,1)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="condition" elementType="Argument"><stringProp name="Argument.name">condition</stringProp><stringProp name="Argument.value">${__P(condition,2)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="distributeType" elementType="Argument"><stringProp name="Argument.name">distributeType</stringProp><stringProp name="Argument.value">${__P(distributeType,1)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="roomId" elementType="Argument"><stringProp name="Argument.name">roomId</stringProp><stringProp name="Argument.value">${__P(roomId,)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="giftId" elementType="Argument"><stringProp name="Argument.name">giftId</stringProp><stringProp name="Argument.value">${__P(giftId,107)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="giftCount" elementType="Argument"><stringProp name="Argument.name">giftCount</stringProp><stringProp name="Argument.value">${__P(giftCount,7)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="totalAmount" elementType="Argument"><stringProp name="Argument.name">totalAmount</stringProp><stringProp name="Argument.value">${__P(totalAmount,266)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="totalCount" elementType="Argument"><stringProp name="Argument.name">totalCount</stringProp><stringProp name="Argument.value">${__P(totalCount,5)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="recipients" elementType="Argument"><stringProp name="Argument.name">recipients</stringProp><stringProp name="Argument.value">${__P(recipients,15712)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="sendGiftId" elementType="Argument"><stringProp name="Argument.name">sendGiftId</stringProp><stringProp name="Argument.value">${__P(sendGiftId,93)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="sendGiftCount" elementType="Argument"><stringProp name="Argument.name">sendGiftCount</stringProp><stringProp name="Argument.value">${__P(sendGiftCount,10)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="sourceType" elementType="Argument"><stringProp name="Argument.name">sourceType</stringProp><stringProp name="Argument.value">${__P(sourceType,1)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="objectId" elementType="Argument"><stringProp name="Argument.name">objectId</stringProp><stringProp name="Argument.value">${__P(objectId,202604290000000003)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+        </collectionProp>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="EastPoint Scenario Runner">
+        <stringProp name="ThreadGroup.num_threads">${__P(threads,1)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(ramp,1)}</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${__P(loops,1)}</stringProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Common Encrypted Headers">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">content-type</stringProp><stringProp name="Header.value">application/json</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">locale</stringProp><stringProp name="Header.value">${locale}</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">timestamp</stringProp><stringProp name="Header.value">${timestamp}</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">sign</stringProp><stringProp name="Header.value">${sign}</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">appLanguage</stringProp><stringProp name="Header.value">en</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">app-language</stringProp><stringProp name="Header.value">en</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">app-type</stringProp><stringProp name="Header.value">0</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">content-sign</stringProp><stringProp name="Header.value">sat1</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">content-status</stringProp><stringProp name="Header.value">1</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">platform-type</stringProp><stringProp name="Header.value">0</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">variant-type</stringProp><stringProp name="Header.value">0</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">build-version</stringProp><stringProp name="Header.value">317</stringProp></elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Prepare encrypted EastPoint request">
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script"><![CDATA[
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import java.security.MessageDigest
+import java.util.Base64
+
+def val = { String name, String fallback = '' ->
+    String value = vars.get(name)
+    if (value == null || value.length() == 0) {
+        value = props.get(name)
+    }
+    return (value == null || value.length() == 0) ? fallback : value
+}
+def intVal = { String name, int fallback -> Integer.parseInt(val(name, String.valueOf(fallback))) }
+def longVal = { String name, long fallback -> Long.parseLong(val(name, String.valueOf(fallback))) }
+def normalizePath = { String path -> path.replace('\\', '/') }
+
+String projectRoot = normalizePath(val('projectRoot', 'E:/python/work/ApiAutomation'))
+String encryptKey = val('encryptKey', 'kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7')
+String iv = 'O6xlNQ4e5oRTVZSu'
+int iteration = Math.max(0, vars.getIteration() - 1)
+int startIndex = intVal('startIndex', 0)
+int rowIndex = startIndex + iteration
+
+def readCsv = { String path ->
+    File file = new File(normalizePath(path))
+    if (!file.exists()) {
+        return []
+    }
+    def lines = file.readLines('UTF-8')
+    if (!lines) {
+        return []
+    }
+    def headers = lines[0].replace('\uFEFF', '').split(',', -1).collect { it.trim() }
+    return lines.drop(1).findAll { it.trim() }.collect { line ->
+        def values = line.split(',', -1)
+        def row = new LinkedHashMap()
+        headers.eachWithIndex { header, index ->
+            row[header] = index < values.size() ? values[index].trim() : ''
+        }
+        return row
+    }
+}
+
+def csvValue = { String pathName, String column, String fallback ->
+    def rows = readCsv(val(pathName, "${projectRoot}/data/${pathName}.csv"))
+    if (!rows) {
+        return fallback
+    }
+    return String.valueOf(rows[rowIndex % rows.size()][column] ?: fallback)
+}
+
+def deviceIdForRow = {
+    String explicit = val('uniqueId', '')
+    if (explicit) {
+        return explicit
+    }
+    def rows = readCsv(val('deviceCsv', "${projectRoot}/data/device_ids.csv"))
+    if (!rows) {
+        return 'bac1131e82cd4c738e3199375ffe77b4'
+    }
+    return String.valueOf(rows[rowIndex % rows.size()].uniqueId ?: 'bac1131e82cd4c738e3199375ffe77b4')
+}
+
+def loadCredentials = {
+    File batchFile = new File(normalizePath(val('batchCredentialsJson', "${projectRoot}/data/batch_login_credentials.json")))
+    File singleFile = new File(normalizePath(val('credentialsJson', "${projectRoot}/data/login_credentials.json")))
+    File file = batchFile.exists() ? batchFile : singleFile
+    if (!file.exists()) {
+        throw new IllegalStateException("登录凭证文件不存在: ${batchFile.path} 或 ${singleFile.path}")
+    }
+    def raw = new JsonSlurper().parse(file)
+    def credentials = []
+    raw.each { key, item ->
+        credentials << [
+            phone_number: String.valueOf(item.phone_number ?: key),
+            stayUserId: String.valueOf(item.stayUserId ?: key),
+            stayToken: String.valueOf(item.stayToken ?: ''),
+            uniqueId: String.valueOf(item.uniqueId ?: '')
+        ]
+    }
+    credentials = credentials.findAll { it.stayUserId && it.stayToken }
+    if (!credentials) {
+        throw new IllegalStateException("登录凭证为空或缺少 stayUserId/stayToken")
+    }
+    return credentials
+}
+
+def selectCredential = {
+    String phone = val('phone', '')
+    def credentials = loadCredentials()
+    if (phone) {
+        def found = credentials.find { it.phone_number == phone || it.stayUserId == phone }
+        if (!found) {
+            throw new IllegalStateException("未找到手机号或用户ID对应的登录凭证: ${phone}")
+        }
+        return found
+    }
+    return credentials[rowIndex % credentials.size()]
+}
+
+def b64 = { Object value ->
+    value == null ? null : Base64.encoder.encodeToString(String.valueOf(value).getBytes('UTF-8'))
+}
+
+def parseList = { String text ->
+    text.split(/[,\s]+/).findAll { it }.collect { item ->
+        (item ==~ /-?\d+/) ? Long.parseLong(item) : item
+    }
+}
+
+def filterEmpty
+filterEmpty = { obj ->
+    if (obj instanceof Map) {
+        def result = new LinkedHashMap()
+        obj.each { key, value ->
+            def cleaned = filterEmpty(value)
+            if (cleaned != null && cleaned != '' && cleaned != [] && cleaned != [:]) {
+                result[key] = cleaned
+            }
+        }
+        return result
+    }
+    if (obj instanceof List) {
+        return obj.collect { filterEmpty(it) }.findAll { it != null && it != '' && it != [] && it != [:] }
+    }
+    return obj
+}
+
+def transformSignKeys = { Map data ->
+    def result = new LinkedHashMap()
+    data.each { key, value ->
+        String newKey
+        if (key.startsWith('stay')) {
+            newKey = key.substring(4)
+            if (newKey) {
+                newKey = newKey[0].toLowerCase() + newKey.substring(1)
+            }
+        } else {
+            newKey = key ? key[0].toLowerCase() + key.substring(1) : key
+        }
+        result[newKey] = value
+    }
+    return result
+}
+
+def sha256 = { String text ->
+    MessageDigest md = MessageDigest.getInstance('SHA-256')
+    return md.digest(text.getBytes('UTF-8')).collect { String.format('%02x', it) }.join()
+}
+
+def encryptPayload = { Map data ->
+    String json = JsonOutput.toJson(filterEmpty(data))
+    byte[] base64Json = Base64.encoder.encode(json.getBytes('UTF-8'))
+    Cipher cipher = Cipher.getInstance('AES/CBC/PKCS5Padding')
+    cipher.init(
+        Cipher.ENCRYPT_MODE,
+        new SecretKeySpec(encryptKey.getBytes('UTF-8'), 'AES'),
+        new IvParameterSpec(iv.getBytes('UTF-8'))
+    )
+    return Base64.encoder.encodeToString(cipher.doFinal(base64Json))
+}
+
+def signAndStore = { Map payload, String localeValue ->
+    def cleanPayload = filterEmpty(payload)
+    String timestamp = String.valueOf(System.currentTimeMillis())
+    String signSource = JsonOutput.toJson(filterEmpty(transformSignKeys(cleanPayload)))
+    String sign = sha256("${signSource}&locale=${localeValue}&timestamp=${timestamp}${encryptKey}")
+    vars.put('locale', localeValue)
+    vars.put('timestamp', timestamp)
+    vars.put('sign', sign)
+    vars.put('encryptedBody', encryptPayload(cleanPayload))
+    vars.put('plainPayload', JsonOutput.toJson(cleanPayload))
+    vars.put('signSource', signSource)
+}
+
+def loginPayload = {
+    String phone = val('phone', '') ?: csvValue('loginCsv', 'phone_number', '15200711073')
+    String uniqueId = deviceIdForRow()
+    vars.put('currentPhone', phone)
+    vars.put('currentUniqueId', uniqueId)
+    return [
+        platformType: 0,
+        appType: 0,
+        variantType: 0,
+        appVersion: '2.1.4',
+        buildVersion: 317,
+        osModel: 'V2278A',
+        osVersion: '13',
+        language: 'en',
+        uniqueId: uniqueId,
+        uuid: '9fcd8047c27442138fdbdcddcb026ebd',
+        deviceId: 'be825900787d419f9872eed48566f45c',
+        widevineId: null,
+        idfv: null,
+        idfa: null,
+        mcc: null,
+        mnc: null,
+        networkName: null,
+        inviteCode: null,
+        downloadChannel: null,
+        ipAddress: '41.235.64.230',
+        remoteIp: '41.235.64.230',
+        timezone: 'Asia/Shanghai',
+        tablet: 0,
+        simulator: 0,
+        useVpn: 0,
+        useRoot: 0,
+        useDebug: 0,
+        mockLocation: 0,
+        languageCountry: 'en',
+        appLanguage: 'en',
+        areaCode: val('areaCode', '86'),
+        phoneNumber: phone,
+        password: b64(val('plainPassword', 'a123456')),
+        verificationCode: val('verificationCode', '8888'),
+        captchaType: 0,
+        loginPwdType: 0
+    ]
+}
+
+def registerData = {
+    String phone = val('phone', '') ?: csvValue('registerCsv', 'phone_number', '13900011111')
+    String uniqueId = deviceIdForRow()
+    vars.put('currentPhone', phone)
+    vars.put('currentUniqueId', uniqueId)
+    return [phone: phone, uniqueId: uniqueId]
+}
+
+def credential = null
+String sampleName = sampler.getName()
+Map payload
+String localeValue = 'en'
+vars.put('token', '')
+
+if (sampleName.contains('Login Phone')) {
+    payload = loginPayload()
+    localeValue = String.valueOf(payload.language ?: 'en')
+} else if (sampleName.contains('Send Verification Code')) {
+    def data = registerData()
+    payload = [
+        platformType: 0,
+        appType: 0,
+        variantType: 0,
+        appVersion: '2.1.3',
+        buildVersion: 317,
+        osModel: 'RMX3511',
+        osVersion: '33',
+        language: 'ar',
+        uniqueId: data.uniqueId,
+        userSmsType: 0,
+        areaCode: val('areaCode', '86'),
+        phoneNumber: data.phone,
+        validate: null,
+        remoteIp: '41.235.64.230',
+        ipAddress: '41.235.64.230'
+    ]
+    localeValue = String.valueOf(payload.language ?: 'ar')
+} else if (sampleName.contains('Register User')) {
+    String phone = vars.get('currentPhone') ?: (val('phone', '') ?: csvValue('registerCsv', 'phone_number', '13900011111'))
+    String uniqueId = vars.get('currentUniqueId') ?: deviceIdForRow()
+    payload = [
+        platformType: 0,
+        appType: 0,
+        variantType: 0,
+        appVersion: '2.1.3',
+        buildVersion: 317,
+        osModel: 'RMX3511',
+        osVersion: '33',
+        language: 'ar',
+        uniqueId: uniqueId,
+        adid: null,
+        uuid: '9fcd8047c27442138fdbdcddcb026ebd',
+        gaid: null,
+        deviceId: 'be825900787d419f9872eed48566f45c',
+        widevineId: null,
+        idfv: null,
+        idfa: null,
+        tablet: 0,
+        simulator: 0,
+        useVpn: 0,
+        vpnAddress: null,
+        useRoot: 0,
+        useDebug: 0,
+        mockLocation: 0,
+        timezone: 'Asia/Shanghai',
+        languageCountry: 'CN',
+        mcc: null,
+        mnc: null,
+        networkName: null,
+        appLanguage: 'en',
+        inviteCode: null,
+        downloadChannel: null,
+        ipAddress: '41.235.64.230',
+        areaCode: val('areaCode', '86'),
+        phoneNumber: phone,
+        verificationCode: val('verificationCode', '8888')
+    ]
+    localeValue = String.valueOf(payload.language ?: 'ar')
+} else if (sampleName.contains('Send Coin Red Packet')) {
+    credential = selectCredential()
+    vars.put('token', credential.stayToken)
+    String roomId = val('roomId', '') ?: credential.stayUserId
+    payload = [
+        roomId: roomId,
+        totalAmount: intVal('amount', 20000),
+        totalCount: intVal('coinCount', 1),
+        claimCondition: intVal('condition', 2),
+        distributeType: intVal('distributeType', 1)
+    ]
+} else if (sampleName.contains('Send Gift Red Packet')) {
+    credential = selectCredential()
+    vars.put('token', credential.stayToken)
+    String roomId = val('roomId', '') ?: credential.stayUserId
+    payload = [
+        roomId: roomId,
+        giftId: intVal('giftId', 107),
+        giftCount: intVal('giftCount', 7),
+        totalAmount: intVal('totalAmount', 266),
+        totalCount: intVal('totalCount', 5),
+        claimCondition: intVal('condition', 2),
+        distributeType: intVal('distributeType', 1)
+    ]
+} else if (sampleName.contains('Receive Red Packet')) {
+    credential = selectCredential()
+    vars.put('token', credential.stayToken)
+    payload = [
+        redPacketId: vars.get('extractedRedPacketId') ?: val('redPacketId', '1')
+    ]
+} else if (sampleName.contains('Batch Send Gift')) {
+    credential = selectCredential()
+    vars.put('token', credential.stayToken)
+    payload = [
+        recipients: parseList(val('recipients', '15712')),
+        giftId: intVal('sendGiftId', 93),
+        count: intVal('sendGiftCount', 10),
+        sourceType: intVal('sourceType', 1),
+        objectId: longVal('objectId', 202604290000000003L),
+        roomId: val('roomId', '15712') ?: '15712'
+    ]
+} else if (sampleName.contains('Business Sample')) {
+    credential = selectCredential()
+    vars.put('token', credential.stayToken)
+    payload = [
+        userId: credential.stayUserId,
+        phoneNumber: credential.phone_number,
+        action: 'queryStatus'
+    ]
+} else {
+    throw new IllegalStateException("未知 Sampler: ${sampleName}")
+}
+
+if (credential != null) {
+    vars.put('currentPhone', credential.phone_number)
+    vars.put('currentStayUserId', credential.stayUserId)
+}
+signAndStore(payload, localeValue)
+]]></stringProp>
+        </JSR223PreProcessor>
+        <hashTree/>
+        <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Assert EastPoint response success">
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script"><![CDATA[
+import groovy.json.JsonSlurper
+
+String text = prev.getResponseDataAsString()
+def response
+try {
+    response = new JsonSlurper().parseText(text)
+} catch (Exception e) {
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage("响应不是 JSON: " + text)
+    return
+}
+
+def codeOk = { value -> value in [0, '0', 200, '200'] }
+boolean success = false
+if (response instanceof Map) {
+    success = codeOk(response.stayCode) ||
+        response.stayIsSuccess == true ||
+        codeOk(response.code) ||
+        response.success == true ||
+        response.status in ['success', 'ok', 'SUCCESS', 'OK']
+    if (!success && response.data instanceof Map) {
+        success = response.data.token || response.data.accessToken || response.data.jwt
+    }
+}
+vars.put('apiSuccess', String.valueOf(success))
+
+if (!success) {
+    def message = response.stayErrorMessage ?: response.stayMessage ?: response.errorMessage ?: response.message ?: response.msg ?: response.error ?: '未知错误'
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage("${prev.getSampleLabel()} 失败: phone=${vars.get('currentPhone')}, message=${message}, response=${text}")
+}
+]]></stringProp>
+        </JSR223Assertion>
+        <hashTree/>
+        <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Extract credentials and red packet id">
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script"><![CDATA[
+import groovy.json.JsonSlurper
+
+def response
+try {
+    response = new JsonSlurper().parseText(prev.getResponseDataAsString())
+} catch (Exception ignored) {
+    return
+}
+if (!(response instanceof Map)) {
+    return
+}
+
+def candidates = []
+if (response.stayResult instanceof Map) {
+    candidates << response.stayResult
+}
+if (response.data instanceof Map) {
+    candidates << response.data
+}
+candidates << response
+
+candidates.find { item ->
+    if (item instanceof Map && item.stayUserId && item.stayToken) {
+        vars.put('stayUserId', String.valueOf(item.stayUserId))
+        vars.put('stayToken', String.valueOf(item.stayToken))
+        return true
+    }
+    return false
+}
+
+candidates.find { item ->
+    if (item instanceof Map && item.stayRedPacketId) {
+        vars.put('extractedRedPacketId', String.valueOf(item.stayRedPacketId))
+        return true
+    }
+    return false
+}
+]]></stringProp>
+        </JSR223PostProcessor>
+        <hashTree/>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: login_batch">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['login_batch','login','all_apis'])}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login Phone">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/user/stay/login/password</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Pacing 2s"><stringProp name="ConstantTimer.delay">2000</stringProp></ConstantTimer>
+          <hashTree/>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: register_batch">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['register_batch','register','all_apis'])}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Send Verification Code">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/user/stay/send-code</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Wait before register 3s"><stringProp name="ConstantTimer.delay">3000</stringProp></ConstantTimer>
+          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Register User">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/user/stay/login/phone</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree/>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: send_coin_red_packet">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['send_coin_red_packet','send_coin','all_apis'])}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Send Coin Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/send/coin</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: send_gift_red_packet">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['send_gift_red_packet','all_apis'])}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Send Gift Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/send/gift</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: receive_red_packet">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'receive_red_packet')}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Receive Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/receive</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: coin_then_receive">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'coin_then_receive')}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Send Coin Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/send/coin</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Wait before receive 500ms"><stringProp name="ConstantTimer.delay">500</stringProp></ConstantTimer>
+          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Receive Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/receive</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: gift_then_receive">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'gift_then_receive')}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Send Gift Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/send/gift</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Wait before receive 500ms"><stringProp name="ConstantTimer.delay">500</stringProp></ConstantTimer>
+          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Receive Red Packet">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/payer/redPacket/receive</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: send_gift">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['send_gift','batch_send_gift','all_apis'])}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Batch Send Gift">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/live/stay/gift/batch-send</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: business_sample">
+          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['business_sample','business','all_apis'])}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Business Sample">
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><boolProp name="HTTPArgument.use_equals">false</boolProp><stringProp name="Argument.value">${encryptedBody}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp><stringProp name="HTTPSampler.protocol">${protocol}</stringProp><stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp><stringProp name="HTTPSampler.path">/user/stay/business/operation</stringProp><stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp><boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree><HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Token Header"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">token</stringProp><stringProp name="Header.value">${token}</stringProp></elementProp></collectionProp></HeaderManager><hashTree/></hashTree>
+        </hashTree>
+
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time><latency>true</latency><timestamp>true</timestamp><success>true</success><label>true</label><code>true</code><message>true</message><threadName>true</threadName><dataType>true</dataType><encoding>false</encoding><assertions>true</assertions><subresults>true</subresults><responseData>false</responseData><samplerData>false</samplerData><xml>false</xml><fieldNames>true</fieldNames><responseHeaders>false</responseHeaders><requestHeaders>false</requestHeaders><responseDataOnError>false</responseDataOnError><saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage><assertionsResultsToSave>0</assertionsResultsToSave><bytes>true</bytes><sentBytes>true</sentBytes><url>true</url><threadCounts>true</threadCounts><idleTime>true</idleTime><connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
