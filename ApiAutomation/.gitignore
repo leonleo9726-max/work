@@ -55,4 +55,6 @@ Thumbs.db
 # Project-specific outputs
 # =========================
 reports/
+data/local/
 data/*credentials*.json
+.env

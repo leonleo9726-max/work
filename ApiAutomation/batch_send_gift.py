@@ -1,26 +1,25 @@
 """
 批量发送礼物脚本（多线程 + 连接池）。
 
-使用 ThreadPoolExecutor 并发发送礼物，通过 HttpUtils 连接池复用 HTTP 连接。
+使用 BatchRunner 执行并发与重试，通过 HttpUtils 复用 HTTP 连接。
 """
 
 import argparse
-import json
 import logging
 import random
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
+from common.api_paths import BATCH_SEND_GIFT_PATH
+from common.auth_utils import build_business_headers, load_batch_login_credentials
+from common.batch_runner import BatchPolicy, BatchRunner
 from common.http_utils import HttpUtils
-from common.business_utils import is_success, get_error_details, build_business_headers
+from common.logging_utils import install_sensitive_data_filter
+from common.response_utils import get_error_details, is_success
 from config import settings
 
+PROJECT_ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
 
 
@@ -33,37 +32,7 @@ def configure_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
         stream=sys.stdout,
     )
-
-
-BATCH_SEND_GIFT_PATH = "/live/stay/gift/batch-send"
-
-
-def load_login_credentials():
-    """从 batch_login_credentials.json 加载登录凭证"""
-    credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
-    if not credentials_file.exists():
-        logger.error("错误: 登录凭证文件不存在: %s", credentials_file)
-        logger.error("请先运行 batch_login.py --save-credentials 生成登录凭证")
-        sys.exit(1)
-
-    with credentials_file.open("r", encoding="utf-8") as f:
-        credentials = json.load(f)
-
-    # 转换为列表，每个元素包含手机号和凭证信息
-    # batch_login_credentials.json 的 key 是手机号
-    credential_list = []
-    for phone_number, cred in credentials.items():
-        credential_list.append({
-            "stayUserId": cred.get("stayUserId", ""),
-            "phone_number": cred.get("phone_number", phone_number),
-            "stayToken": cred.get("stayToken", ""),
-            "uniqueId": cred.get("uniqueId", "")
-        })
-
-    return credential_list
-
-
-
+    install_sensitive_data_filter()
 
 
 def execute_send_gift(credential, recipients, gift_id, count, source_type, object_id, room_id, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
@@ -98,7 +67,7 @@ def execute_send_gift(credential, recipients, gift_id, count, source_type, objec
             url=url,
             data=payload,
             headers=headers,
-            encrypt_key=settings.TEST_ENCRYPT_KEY,
+            encrypt_key=settings.require_encrypt_key(),
             locale="en",
             timestamp=str(int(time.time() * 1000)),
         )
@@ -160,18 +129,15 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="是否打印每条成功日志")
     parser.add_argument("--start-index", type=int, default=0, help="从第几个用户开始，默认0")
     parser.add_argument("--max-count", type=int, default=0, help="最多发送多少个用户，默认0表示全部")
-    parser.add_argument("--show-full-response", action="store_true", help="打印完整的失败响应（用于调试）")
-
     # 礼物参数
-    parser.add_argument("--recipients", type=int, nargs="+", default=[15712],
-                        help="接收者用户ID列表，可传多个值，默认: 15712")
+    parser.add_argument("--recipients", type=int, nargs="+", required=True,
+                        help="接收者用户ID列表，可传多个值")
     parser.add_argument("--gift-id", type=int, default=93, help="礼物ID，默认93")
     parser.add_argument("--count", type=int, default=10, help="礼物数量，默认10")
     parser.add_argument("--source-type", type=int, default=1, choices=[1, 2],
                         help="来源类型，默认1")
-    parser.add_argument("--object-id", type=int, default=202604290000000003,
-                        help="对象ID，默认202604290000000003")
-    parser.add_argument("--room-id", type=str, default="15712", help="房间ID，默认15712")
+    parser.add_argument("--object-id", type=int, required=True, help="对象ID")
+    parser.add_argument("--room-id", type=str, required=True, help="房间ID")
 
     args = parser.parse_args()
 
@@ -179,7 +145,7 @@ def main():
     configure_logging(args.verbose)
 
     # 加载登录凭证
-    credentials = load_login_credentials()
+    credentials = load_batch_login_credentials()
     if args.max_count > 0:
         credentials = credentials[args.start_index : args.start_index + args.max_count]
     else:
@@ -187,7 +153,7 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        logger.error("没有找到可用的登录凭证，请检查 data/batch_login_credentials.json")
+        logger.error("没有找到可用的登录凭证，请检查 data/local/batch_login_credentials.json")
         return
 
     logger.info("开始批量发送礼物: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
@@ -198,43 +164,49 @@ def main():
     failures = []
     start_time = time.time()
 
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_cred = {
-            executor.submit(
-                execute_send_gift,
-                cred,
-                args.recipients,
-                args.gift_id,
-                args.count,
-                args.source_type,
-                args.object_id,
-                args.room_id,
-                args.delay,
-                args.verbose,
-                args.retry,
-                args.retry_delay,
-                args.jitter,
-            ): cred
-            for cred in credentials
+    summary = BatchRunner(finalizer=HttpUtils.close_session).run(
+        credentials,
+        lambda credential: execute_send_gift(
+            credential,
+            args.recipients,
+            args.gift_id,
+            args.count,
+            args.source_type,
+            args.object_id,
+            args.room_id,
+            0,
+            args.verbose,
+            1,
+            0,
+            0,
+        ),
+        BatchPolicy(
+            workers=args.workers,
+            attempts=args.retry,
+            delay=args.delay,
+            retry_delay=args.retry_delay,
+            jitter=args.jitter,
+        ),
+        succeeded=lambda result: result["ok"],
+    )
+    for item_result in summary.results:
+        result = item_result.result or {
+            "ok": False,
+            "phone": item_result.item.get("phone_number", "***"),
+            "stayUserId": item_result.item.get("stayUserId", "***"),
+            "stage": "exception",
+            "error_details": item_result.error,
         }
-
-        for future in as_completed(future_to_cred):
-            result = future.result()
-            if result["ok"]:
-                success_count += 1
-            else:
-                failures.append(result)
-                error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], result.get('attempt', 1))
-                logger.debug("        错误: %s", error_msg)
-                if args.show_full_response and result.get('response'):
-                    logger.debug("        完整响应: %s", json.dumps(result['response'], ensure_ascii=False, indent=2))
+        if result["ok"]:
+            success_count += 1
+        else:
+            failures.append(result)
+            error_msg = result.get('error_details', '未知错误')
+            logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], item_result.attempts)
+            logger.debug("        错误: %s", error_msg)
 
     elapsed = time.time() - start_time
     logger.info("批量发送礼物完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
-
-    # 清理当前线程的 Session 连接
-    HttpUtils.close_session()
 
     if failures:
         logger.warning("失败用户列表 (手机号 - 用户ID):")
@@ -243,8 +215,7 @@ def main():
 
 
 # 使用示例:
-#   python batch_send_gift.py --workers 5 --delay 0.5 --recipients 15685 --gift-id 93 --count 10 --object-id 202604290000000010
-#   python batch_send_gift.py --workers 5 --delay 0.5 --recipients 15685 --gift-id 15 --count 10 --object-id 202604290000000014 --room-id 15685 --show-full-response
+#   python batch_send_gift.py --workers 5 --delay 0.5 --recipients <ID> --gift-id 93 --count 10 --object-id <ID> --room-id <ID>
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,6 @@
-# ApiAutomation 项目分析与优化计划
+# ApiAutomation 项目分析与优化计划（已归档）
+
+> 本文是历史分析快照。当前运行方式、目录结构和安全规则以 `ApiAutomation/README.md`、仓库 `AGENTS.md` 与代码配置为准。
 
 ## 一、项目概况
 

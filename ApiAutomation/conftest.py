@@ -8,11 +8,10 @@ pytest 全局配置。
 4. 日志配置
 """
 
-import logging
-import sys
-from pathlib import Path
 
 import pytest
+
+from common.logging_utils import install_sensitive_data_filter
 from config import settings
 
 
@@ -23,6 +22,25 @@ def pytest_addoption(parser):
         default=False,
         help="run tests that call external APIs",
     )
+
+
+def pytest_collection_modifyitems(config, items):
+    """默认跳过所有真实 API 测试，只有 --run-api 显式放行。"""
+    if config.getoption("--run-api"):
+        return
+
+    skip_api = pytest.mark.skip(reason="需要 --run-api 才能执行真实 API 测试")
+    for item in items:
+        if item.get_closest_marker("api") is not None:
+            item.add_marker(skip_api)
+
+
+def pytest_configure():
+    install_sensitive_data_filter()
+
+
+def pytest_runtest_setup():
+    install_sensitive_data_filter()
 
 
 @pytest.fixture(scope="session")
@@ -40,5 +58,4 @@ def default_headers():
 
 @pytest.fixture(scope="session")
 def encrypt_key():
-    from config import settings
-    return settings.TEST_ENCRYPT_KEY
+    return settings.require_encrypt_key()

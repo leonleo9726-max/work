@@ -1,30 +1,18 @@
-import json
 import base64
 import hashlib
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import json
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 
 class SignUtils:
-    # Keep class-level key for backward compatibility.
-    test_encrypt_key = "kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7"
-
     @staticmethod
     def filter_empty_values(data):
         """过滤空值"""
         if isinstance(data, dict):
-            result = {}
-            for key, value in data.items():
-                cleaned = SignUtils.filter_empty_values(value)
-                if cleaned is not None and cleaned != '' and cleaned != [] and cleaned != {}:
-                    result[key] = cleaned
-            return result
-        if isinstance(data, list):
-            return [
-                item
-                for item in (SignUtils.filter_empty_values(value) for value in data)
-                if item is not None and item != '' and item != [] and item != {}
-            ]
+            return {k: v for k, v in data.items() if v is not None and v != '' and v != [] and v != {}}
         return data
     
     @staticmethod
@@ -87,6 +75,3 @@ class SignUtils:
         sha256 = hashlib.sha256()
         sha256.update(sign_string.encode('utf-8'))
         return sha256.hexdigest().lower()
-
-# 测试环境key
-test_encrypt_key = "kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7"
