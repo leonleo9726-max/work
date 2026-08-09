@@ -5,7 +5,7 @@
 消除各测试文件和批量脚本中的重复代码。
 """
 
-from typing import Any, Optional
+from typing import Any
 
 
 def is_api_success(response: Any) -> bool:
@@ -124,10 +124,30 @@ def extract_error_details(response: Any) -> str:
 
     if parts:
         return "; ".join(parts)
-    return str(response)
+    return "未知错误"
 
 
-def extract_stay_red_packet_id(response: Any) -> Optional[str]:
+def check_success_or_fail(response: Any, context: str = "操作") -> str | None:
+    """成功返回 None；失败返回适合日志显示的脱敏错误。"""
+    if is_api_success(response):
+        return None
+    return f"{context}失败: {extract_error_details(response)}"
+
+
+def require_success(response: Any, context: str = "操作") -> bool:
+    """要求响应成功，否则抛出包含安全错误摘要的异常。"""
+    error = check_success_or_fail(response, context)
+    if error:
+        raise RuntimeError(error)
+    return True
+
+
+# 批处理脚本的兼容命名；implementation 仅保留在本 module。
+is_success = is_api_success
+get_error_details = extract_error_details
+
+
+def extract_stay_red_packet_id(response: Any) -> str | None:
     """从发红包接口的响应中提取 stayRedPacketId。
 
     支持多种响应结构：
@@ -167,7 +187,7 @@ def extract_stay_red_packet_id(response: Any) -> Optional[str]:
     return None
 
 
-def extract_login_info(response: Any) -> Optional[dict]:
+def extract_login_info(response: Any) -> dict | None:
     """从登录响应中提取 stayUserId 和 stayToken。
 
     Args:

@@ -1,4 +1,4 @@
-pytest
-pytest-html
-requests
-cryptography
+cryptography==46.0.7
+pytest==9.0.3
+pytest-html==4.2.0
+requests==2.32.5

@@ -1,2 +1,5 @@
 ### Git Worktree ###
 .worktrees/
+
+### macOS ###
+.DS_Store

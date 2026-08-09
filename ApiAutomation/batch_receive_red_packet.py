@@ -10,22 +10,25 @@
 """
 
 import argparse
-import json
 import logging
 import random
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
+from common.api_paths import (
+    RECEIVE_RED_PACKET_PATH,
+    SEND_COIN_RED_PACKET_PATH,
+    SEND_GIFT_RED_PACKET_PATH,
+)
+from common.auth_utils import build_business_headers, load_batch_login_credentials
+from common.batch_runner import BatchPolicy, BatchRunner
 from common.http_utils import HttpUtils
-from common.business_utils import is_success, get_error_details, build_business_headers, extract_stay_red_packet_id
+from common.logging_utils import install_sensitive_data_filter
+from common.response_utils import extract_stay_red_packet_id, get_error_details, is_success
 from config import settings
 
+PROJECT_ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
 
 
@@ -38,50 +41,7 @@ def configure_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
         stream=sys.stdout,
     )
-
-
-RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
-SEND_COIN_RED_PACKET_PATH = "/payer/redPacket/send/coin"
-SEND_GIFT_RED_PACKET_PATH = "/payer/redPacket/send/gift"
-
-
-def load_login_credentials():
-    """从JSON文件加载登录凭证（优先加载 batch_login_credentials.json）"""
-    # 优先使用 batch_login_credentials.json
-    batch_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
-    single_file = PROJECT_ROOT / "data" / "login_credentials.json"
-    
-    if batch_file.exists():
-        credentials_file = batch_file
-    elif single_file.exists():
-        credentials_file = single_file
-    else:
-        logger.error("错误: 登录凭证文件不存在")
-        logger.error("  请检查以下文件是否存在:")
-        logger.error("    - %s", batch_file)
-        logger.error("    - %s", single_file)
-        logger.error("请先运行 batch_login.py --save-credentials 生成登录凭证")
-        sys.exit(1)
-    
-    with credentials_file.open("r", encoding="utf-8") as f:
-        credentials = json.load(f)
-    
-    # 转换为列表，每个元素包含手机号和凭证信息
-    credential_list = []
-    for key, cred in credentials.items():
-        # key 可能是手机号（batch_login_credentials.json）或 stayUserId（login_credentials.json）
-        stay_user_id = cred.get("stayUserId", key)
-        credential_list.append({
-            "stayUserId": stay_user_id,
-            "phone_number": cred.get("phone_number", key),
-            "stayToken": cred.get("stayToken", ""),
-            "uniqueId": cred.get("uniqueId", "")
-        })
-    
-    return credential_list
-
-
-
+    install_sensitive_data_filter()
 
 
 def is_red_packet_exhausted(response):
@@ -142,7 +102,7 @@ def execute_receive_red_packet(credential, red_packet_id, delay, verbose=False, 
             url=url,
             data=payload,
             headers=headers,
-            encrypt_key=settings.TEST_ENCRYPT_KEY,
+            encrypt_key=settings.require_encrypt_key(),
             locale="en",
             timestamp=str(int(time.time() * 1000)),
         )
@@ -219,7 +179,7 @@ def execute_send_coin_only(credential, room_id, amount, count, condition, distri
             url=send_url,
             data=send_payload,
             headers=headers,
-            encrypt_key=settings.TEST_ENCRYPT_KEY,
+            encrypt_key=settings.require_encrypt_key(),
             locale="en",
             timestamp=str(int(time.time() * 1000)),
         )
@@ -295,7 +255,7 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
             url=send_url,
             data=send_payload,
             headers=headers,
-            encrypt_key=settings.TEST_ENCRYPT_KEY,
+            encrypt_key=settings.require_encrypt_key(),
             locale="en",
             timestamp=str(int(time.time() * 1000)),
         )
@@ -378,7 +338,7 @@ def main():
     configure_logging(args.verbose)
 
     # 加载登录凭证
-    credentials = load_login_credentials()
+    credentials = load_batch_login_credentials()
     if args.max_count > 0:
         credentials = credentials[args.start_index : args.start_index + args.max_count]
     else:
@@ -386,7 +346,7 @@ def main():
 
     total = len(credentials)
     if total == 0:
-        logger.error("没有找到可用的登录凭证，请检查 data/login_credentials.json")
+        logger.error("没有找到可用的登录凭证，请检查 data/local/login_credentials.json")
         return
 
     # 确定运行模式
@@ -432,29 +392,33 @@ def main():
             
             logger.info("  [RECEIVE] 随机选 %s 个用户抢红包...", len(selected_receivers))
             
-            # 并发抢红包
-            with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                future_to_receiver = {
-                    executor.submit(
-                        execute_receive_red_packet,
-                        receiver_cred,
-                        red_packet_id,
-                        args.delay,
-                        args.verbose,
-                        args.retry,
-                        args.retry_delay,
-                        args.jitter,
-                    ): receiver_cred
-                    for receiver_cred in selected_receivers
+            receive_summary = BatchRunner().run(
+                selected_receivers,
+                lambda credential, packet_id=red_packet_id: execute_receive_red_packet(
+                    credential, packet_id, 0, args.verbose, 1, 0, 0
+                ),
+                BatchPolicy(
+                    workers=args.workers,
+                    attempts=args.retry,
+                    delay=args.delay,
+                    retry_delay=args.retry_delay,
+                    jitter=args.jitter,
+                ),
+                succeeded=lambda result: result["ok"],
+            )
+            for item_result in receive_summary.results:
+                result = item_result.result or {
+                    "ok": False,
+                    "phone": item_result.item.get("phone_number", "***"),
+                    "stayUserId": item_result.item.get("stayUserId", "***"),
+                    "error_details": item_result.error,
                 }
-                for future in as_completed(future_to_receiver):
-                    result = future.result()
-                    if result["ok"]:
-                        total_receive_success += 1
-                    else:
-                        total_receive_failures.append(result)
-                        error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                        logger.warning("    [FAILED] %s (ID: %s) 抢红包失败: %s", result['phone'], result['stayUserId'], error_msg[:80])
+                if result["ok"]:
+                    total_receive_success += 1
+                else:
+                    total_receive_failures.append(result)
+                    error_msg = result.get('error_details', '未知错误')
+                    logger.warning("    [FAILED] %s (ID: %s) 抢红包失败: %s", result['phone'], result['stayUserId'], error_msg[:80])
         
         elapsed = time.time() - start_time
         
@@ -512,29 +476,33 @@ def main():
             
             logger.info("  [RECEIVE] 随机选 %s 个用户抢红包...", len(selected_receivers))
             
-            # 并发抢红包
-            with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                future_to_receiver = {
-                    executor.submit(
-                        execute_receive_red_packet,
-                        receiver_cred,
-                        red_packet_id,
-                        args.delay,
-                        args.verbose,
-                        args.retry,
-                        args.retry_delay,
-                        args.jitter,
-                    ): receiver_cred
-                    for receiver_cred in selected_receivers
+            receive_summary = BatchRunner().run(
+                selected_receivers,
+                lambda credential, packet_id=red_packet_id: execute_receive_red_packet(
+                    credential, packet_id, 0, args.verbose, 1, 0, 0
+                ),
+                BatchPolicy(
+                    workers=args.workers,
+                    attempts=args.retry,
+                    delay=args.delay,
+                    retry_delay=args.retry_delay,
+                    jitter=args.jitter,
+                ),
+                succeeded=lambda result: result["ok"],
+            )
+            for item_result in receive_summary.results:
+                result = item_result.result or {
+                    "ok": False,
+                    "phone": item_result.item.get("phone_number", "***"),
+                    "stayUserId": item_result.item.get("stayUserId", "***"),
+                    "error_details": item_result.error,
                 }
-                for future in as_completed(future_to_receiver):
-                    result = future.result()
-                    if result["ok"]:
-                        total_receive_success += 1
-                    else:
-                        total_receive_failures.append(result)
-                        error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                        logger.warning("    [FAILED] %s (ID: %s) 抢红包失败: %s", result['phone'], result['stayUserId'], error_msg[:80])
+                if result["ok"]:
+                    total_receive_success += 1
+                else:
+                    total_receive_failures.append(result)
+                    error_msg = result.get('error_details', '未知错误')
+                    logger.warning("    [FAILED] %s (ID: %s) 抢红包失败: %s", result['phone'], result['stayUserId'], error_msg[:80])
         
         elapsed = time.time() - start_time
         
@@ -570,53 +538,52 @@ def main():
         duplicate_count = 0
         start_time = time.time()
         
-        with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            future_to_cred = {
-                executor.submit(
-                    task_func,
-                    cred,
-                    *task_args,
-                    args.delay,
-                    args.verbose,
-                    args.retry,
-                    args.retry_delay,
-                    args.jitter,
-                ): cred
-                for cred in receive_credentials
+        receive_summary = BatchRunner(finalizer=HttpUtils.close_session).run(
+            receive_credentials,
+            lambda credential: task_func(
+                credential, *task_args, 0, args.verbose, 1, 0, 0
+            ),
+            BatchPolicy(
+                workers=args.workers,
+                attempts=args.retry,
+                delay=args.delay,
+                retry_delay=args.retry_delay,
+                jitter=args.jitter,
+            ),
+            succeeded=lambda result: result["ok"],
+        )
+        for item_result in receive_summary.results:
+            result = item_result.result or {
+                "ok": False,
+                "phone": item_result.item.get("phone_number", "***"),
+                "stayUserId": item_result.item.get("stayUserId", "***"),
+                "stage": "exception",
+                "error_details": item_result.error,
             }
-            for future in as_completed(future_to_cred):
-                result = future.result()
-                if result["ok"]:
-                    success_count += 1
-                else:
-                    failures.append(result)
-                    
-                    # 统计特殊错误（仅直接抢模式）
-                    if result.get("red_packet_exhausted"):
-                        exhausted_count += 1
-                    if result.get("already_received"):
-                        duplicate_count += 1
-                    
-                    # 根据参数决定是否打印错误
-                    should_print = True
-                    if args.ignore_exhausted and result.get("red_packet_exhausted"):
-                        should_print = False
-                    if args.ignore_duplicate and result.get("already_received"):
-                        should_print = False
-                    
-                    if should_print:
-                        error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                        logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], result.get('attempt', 1))
-                        logger.debug("        错误: %s", error_msg[:100])
+            if result["ok"]:
+                success_count += 1
+            else:
+                failures.append(result)
+
+                if result.get("red_packet_exhausted"):
+                    exhausted_count += 1
+                if result.get("already_received"):
+                    duplicate_count += 1
+
+                should_print = not (
+                    (args.ignore_exhausted and result.get("red_packet_exhausted"))
+                    or (args.ignore_duplicate and result.get("already_received"))
+                )
+                if should_print:
+                    error_msg = result.get('error_details', '未知错误')
+                    logger.warning("[FAILED] %s (ID: %s) stage=%s attempt=%s", result['phone'], result['stayUserId'], result['stage'], item_result.attempts)
+                    logger.debug("        错误: %s", error_msg[:100])
 
         elapsed = time.time() - start_time
         
         logger.info("批量抢红包完成")
         logger.info("  其中: 红包已抢完: %s, 重复抢: %s", exhausted_count, duplicate_count)
         logger.info("成功: %s/%s, 失败: %s, 耗时=%.1fs", success_count, len(receive_credentials), len(failures), elapsed)
-        
-        # 清理当前线程的 Session 连接
-        HttpUtils.close_session()
         
         if failures:
             logger.warning("失败用户列表 (手机号 - 用户ID - 阶段):")

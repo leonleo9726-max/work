@@ -1,7 +1,7 @@
 """
 批量登录脚本（多线程 + 连接池）。
 
-使用 ThreadPoolExecutor 并发执行登录，通过 HttpUtils 连接池复用 HTTP 连接。
+使用 BatchRunner 执行并发与重试，通过 HttpUtils 复用 HTTP 连接。
 """
 
 import argparse
@@ -10,18 +10,17 @@ import logging
 import random
 import sys
 import time
-import base64
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
+from common.api_paths import LOGIN_PHONE_PATH
+from common.batch_runner import BatchPolicy, BatchRunner
 from common.http_utils import HttpUtils
-from common.business_utils import is_success, get_error_details
+from common.logging_utils import install_sensitive_data_filter
+from common.login_operations import create_login_phone_params
+from common.response_utils import extract_login_info, get_error_details, is_success
 from config import settings
 
+PROJECT_ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +33,7 @@ def configure_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
         stream=sys.stdout,
     )
+    install_sensitive_data_filter()
 
 
 def load_csv_values(data_file: Path, field_name: str):
@@ -51,7 +51,7 @@ def load_csv_values(data_file: Path, field_name: str):
 def allocate_unique_ids(phones, unique_ids):
     """为每个手机号分配设备ID，当手机号比设备ID多时循环使用设备ID"""
     if not unique_ids:
-        unique_ids = ["bac1131e82cd4c738e3199375ffe77b4"]
+        unique_ids = ["example-device-id"]
 
     test_cases = []
     # 使用循环分配策略，确保每个设备ID被均匀使用
@@ -63,56 +63,6 @@ def allocate_unique_ids(phones, unique_ids):
     return test_cases
 
 
-def _to_base64(value):
-    """将字符串转为base64编码"""
-    if value is None:
-        return None
-    return base64.b64encode(str(value).encode("utf-8")).decode("utf-8")
-
-
-def create_login_params(phone_number, unique_id, verification_code="8888", area_code="86", password="a123456"):
-    """创建登录参数"""
-    params = {
-        "platformType": 0,
-        "appType": 0,
-        "variantType": 0,
-        "appVersion": "2.1.4",
-        "buildVersion": 317,
-        "osModel": "V2278A",
-        "osVersion": "13",
-        "language": "en",
-        "uniqueId": unique_id,
-        "uuid": "9fcd8047c27442138fdbdcddcb026ebd",
-        "deviceId": "be825900787d419f9872eed48566f45c",
-        "widevineId": None,
-        "idfv": None,
-        "idfa": None,
-        "mcc": None,
-        "mnc": None,
-        "networkName": None,
-        "inviteCode": None,
-        "downloadChannel": None,
-        "ipAddress": "41.235.64.230",
-        "remoteIp": "41.235.64.230",
-        "languageCountry": "en",
-        "appLanguage": "en",
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "verificationCode": verification_code,
-        "captchaType": 0,
-        "loginPwdType": 0,
-        "password": _to_base64(password),
-        "tablet": 0,
-        "simulator": 0,
-        "useVpn": 0,
-        "useRoot": 0,
-        "useDebug": 0,
-        "mockLocation": 0,
-        "timezone": "Asia/Shanghai",
-    }
-    return params
-
-
 def is_network_error(response):
     """检查是否为网络不可用错误（980003000+100087），需要特殊重试处理。"""
     if not isinstance(response, dict):
@@ -121,38 +71,12 @@ def is_network_error(response):
             and "100087" in str(response.get("stayErrorMessage", "")))
 
 
-def extract_login_info(response):
-    """从登录响应中提取用户信息"""
-    if not isinstance(response, dict):
-        return None
-
-    candidates = []
-    if isinstance(response.get("stayResult"), dict):
-        candidates.append(response["stayResult"])
-    if isinstance(response.get("data"), dict):
-        candidates.append(response["data"])
-    candidates.append(response)
-
-    for data in candidates:
-        if not isinstance(data, dict):
-            continue
-        stay_user_id = data.get("stayUserId")
-        stay_token = data.get("stayToken")
-        if stay_user_id and stay_token:
-            return {
-                "stayUserId": str(stay_user_id),
-                "stayToken": str(stay_token),
-            }
-    return None
-
-
-
 def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
     """执行单个登录任务"""
     phone_number = test_case["phone_number"]
     unique_id = test_case["uniqueId"]
     headers = settings.build_common_encrypted_headers()
-    login_url = f"{settings.BASE_URL}{settings.LOGIN_PHONE_PATH}"
+    login_url = f"{settings.BASE_URL}{LOGIN_PHONE_PATH}"
 
     last_failure = None
     for attempt in range(1, retry + 1):
@@ -164,7 +88,7 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
         if verbose and attempt > 1:
             logger.info("[RETRY %s/%s] %s", attempt, retry, phone_number)
 
-        login_payload = create_login_params(phone_number, unique_id)
+        login_payload = create_login_phone_params(phone_number, uniqueId=unique_id)
         login_response = HttpUtils.post(
             url=login_url,
             data=login_payload,
@@ -230,8 +154,8 @@ def main():
     configure_logging(args.verbose)
 
     # 加载手机号和设备ID
-    phones = load_csv_values(PROJECT_ROOT / "data" / "login_phone.csv", "phone_number")
-    unique_ids = load_csv_values(PROJECT_ROOT / "data" / "device_ids.csv", "uniqueId")
+    phones = load_csv_values(PROJECT_ROOT / "data" / "local" / "login_phone.csv", "phone_number")
+    unique_ids = load_csv_values(PROJECT_ROOT / "data" / "local" / "device_ids.csv", "uniqueId")
 
     if args.max_count > 0:
         phones = phones[args.start_index : args.start_index + args.max_count]
@@ -241,7 +165,7 @@ def main():
     test_cases = allocate_unique_ids(phones, unique_ids)
     total = len(test_cases)
     if total == 0:
-        logger.error("没有找到可登录的手机号，请检查 data/login_phone.csv")
+        logger.error("没有找到可登录的手机号，请检查 data/local/login_phone.csv")
         return
 
     logger.info("开始批量登录: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
@@ -251,23 +175,29 @@ def main():
     login_credentials = {}
     start_time = time.time()
     
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_case = {
-            executor.submit(
-                execute_login,
-                case,
-                settings.TEST_ENCRYPT_KEY,
-                args.delay,
-                args.verbose,
-                args.retry,
-                args.retry_delay,
-                args.jitter,
-            ): case
-            for case in test_cases
+    encrypt_key = settings.require_encrypt_key()
+    summary = BatchRunner(finalizer=HttpUtils.close_session).run(
+        test_cases,
+        lambda case: execute_login(
+            case, encrypt_key, 0, args.verbose, 1, 0, 0
+        ),
+        BatchPolicy(
+            workers=args.workers,
+            attempts=args.retry,
+            delay=args.delay,
+            retry_delay=args.retry_delay,
+            jitter=args.jitter,
+        ),
+        succeeded=lambda result: result["ok"],
+    )
+    for item_result in summary.results:
+        result = item_result.result or {
+            "ok": False,
+            "phone": item_result.item["phone_number"],
+            "stage": "exception",
+            "error_details": item_result.error,
         }
-        for future in as_completed(future_to_case):
-            result = future.result()
-            if result["ok"]:
+        if result["ok"]:
                 success_count += 1
                 # 保存登录凭证
                 if args.save_credentials and result.get("login_info"):
@@ -277,24 +207,22 @@ def main():
                         "phone_number": phone,
                         "stayUserId": login_info["stayUserId"],
                         "stayToken": login_info["stayToken"],
-                        "uniqueId": future_to_case[future]["uniqueId"]
+                        "uniqueId": item_result.item["uniqueId"]
                     }
-            else:
-                failures.append(result)
-                error_msg = result.get('error_details', str(result.get('response', '未知错误')))
-                logger.warning("[FAILED] %s stage=%s attempt=%s", result['phone'], result['stage'], result.get('attempt', 1))
-                logger.debug("        错误: %s", error_msg[:100])
+        else:
+            failures.append(result)
+            error_msg = result.get('error_details', '未知错误')
+            logger.warning("[FAILED] %s stage=%s attempt=%s", result['phone'], result['stage'], item_result.attempts)
+            logger.debug("        错误: %s", error_msg[:100])
 
     elapsed = time.time() - start_time
     logger.info("批量登录完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
     
-    # 清理当前线程的 Session 连接
-    HttpUtils.close_session()
-    
     # 保存登录凭证
     if args.save_credentials and login_credentials:
         import json
-        credentials_file = PROJECT_ROOT / "data" / "batch_login_credentials.json"
+        credentials_file = PROJECT_ROOT / "data" / "local" / "batch_login_credentials.json"
+        credentials_file.parent.mkdir(parents=True, exist_ok=True)
         with credentials_file.open("w", encoding="utf-8") as f:
             json.dump(login_credentials, f, ensure_ascii=False, indent=2)
         logger.info("登录凭证已保存到: %s", credentials_file)

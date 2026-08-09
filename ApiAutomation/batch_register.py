@@ -1,7 +1,7 @@
 """
 批量注册脚本（多线程 + 连接池）。
 
-使用 ThreadPoolExecutor 并发执行注册，通过 HttpUtils 连接池复用 HTTP 连接。
+使用 BatchRunner 执行并发与重试，通过 HttpUtils 复用 HTTP 连接。
 """
 
 import argparse
@@ -10,17 +10,21 @@ import logging
 import random
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
+from common.batch_runner import BatchPolicy, BatchRunner
 from common.http_utils import HttpUtils
-from common.business_utils import is_success
+from common.logging_utils import install_sensitive_data_filter
+from common.registration_operations import (
+    create_register_params,
+    create_send_code_params,
+    register_user,
+    send_verification_code,
+)
+from common.response_utils import is_success
 from config import settings
 
+PROJECT_ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +37,7 @@ def configure_logging(verbose: bool = False):
         datefmt="%H:%M:%S",
         stream=sys.stdout,
     )
+    install_sensitive_data_filter()
 
 
 def load_csv_values(data_file: Path, field_name: str):
@@ -48,7 +53,7 @@ def load_csv_values(data_file: Path, field_name: str):
 
 def allocate_unique_ids(phones, unique_ids):
     if not unique_ids:
-        unique_ids = ["00026a07e2434812b65b0c3b40678afe"]
+        unique_ids = ["example-device-id"]
 
     test_cases = []
     for phone in phones:
@@ -58,75 +63,9 @@ def allocate_unique_ids(phones, unique_ids):
     return test_cases
 
 
-def create_send_code_params(phone_number, unique_id, area_code="86", user_sms_type=0):
-    params = {
-        "platformType": 0,
-        "appType": 0,
-        "variantType": 0,
-        "appVersion": "2.1.3",
-        "buildVersion": 317,
-        "osModel": "RMX3511",
-        "osVersion": "33",
-        "language": "ar",
-        "uniqueId": unique_id,
-        "userSmsType": user_sms_type,
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "validate": None,
-        "remoteIp": "41.235.64.230",
-        "ipAddress": "41.235.64.230",
-    }
-    return params
-
-
-def create_register_params(phone_number, unique_id, verification_code="8888", area_code="86"):
-    params = {
-        "platformType": 0,
-        "appType": 0,
-        "variantType": 0,
-        "appVersion": "2.1.3",
-        "buildVersion": 317,
-        "osModel": "RMX3511",
-        "osVersion": "33",
-        "language": "ar",
-        "uniqueId": unique_id,
-        "adid": None,
-        "uuid": "9fcd8047c27442138fdbdcddcb026ebd",
-        "gaid": None,
-        "deviceId": "be825900787d419f9872eed48566f45c",
-        "widevineId": None,
-        "idfv": None,
-        "idfa": None,
-        "tablet": 0,
-        "simulator": 0,
-        "useVpn": 0,
-        "vpnAddress": None,
-        "useRoot": 0,
-        "useDebug": 0,
-        "mockLocation": 0,
-        "timezone": "Asia/Shanghai",
-        "languageCountry": "CN",
-        "mcc": None,
-        "mnc": None,
-        "networkName": None,
-        "appLanguage": "en",
-        "inviteCode": None,
-        "downloadChannel": None,
-        "ipAddress": "41.235.64.230",
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "verificationCode": verification_code,
-    }
-    return params
-
-
-
 def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, retry_delay=1.0):
     phone_number = test_case["phone_number"]
     unique_id = test_case["uniqueId"]
-    headers = settings.build_common_encrypted_headers()
-    send_code_url = f"{settings.BASE_URL}{settings.SEND_CODE_PATH}"
-    register_url = f"{settings.BASE_URL}{settings.REGISTER_PATH}"
 
     last_failure = None
     for attempt in range(1, retry + 1):
@@ -137,12 +76,7 @@ def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, 
             logger.info("[RETRY %s/%s] %s", attempt, retry, phone_number)
 
         send_code_payload = create_send_code_params(phone_number, unique_id)
-        send_response = HttpUtils.post(
-            url=send_code_url,
-            data=send_code_payload,
-            headers=headers,
-            encrypt_key=encrypt_key,
-        )
+        send_response = send_verification_code(send_code_payload, encrypt_key)
 
         if not is_success(send_response):
             last_failure = {
@@ -157,12 +91,7 @@ def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, 
             return last_failure
 
         register_payload = create_register_params(phone_number, unique_id)
-        register_response = HttpUtils.post(
-            url=register_url,
-            data=register_payload,
-            headers=headers,
-            encrypt_key=encrypt_key,
-        )
+        register_response = register_user(register_payload, encrypt_key)
 
         if is_success(register_response):
             if verbose:
@@ -195,8 +124,8 @@ def main():
     # 配置日志
     configure_logging(args.verbose)
 
-    phones = load_csv_values(PROJECT_ROOT / "data" / "register_phone.csv", "phone_number")
-    unique_ids = load_csv_values(PROJECT_ROOT / "data" / "device_ids.csv", "uniqueId")
+    phones = load_csv_values(PROJECT_ROOT / "data" / "local" / "register_phone.csv", "phone_number")
+    unique_ids = load_csv_values(PROJECT_ROOT / "data" / "local" / "device_ids.csv", "uniqueId")
 
     if args.max_count > 0:
         phones = phones[args.start_index : args.start_index + args.max_count]
@@ -206,7 +135,7 @@ def main():
     test_cases = allocate_unique_ids(phones, unique_ids)
     total = len(test_cases)
     if total == 0:
-        logger.error("没有找到可注册的手机号，请检查 data/register_phone.csv")
+        logger.error("没有找到可注册的手机号，请检查 data/local/register_phone.csv")
         return
 
     logger.info("开始批量注册: total=%s, workers=%s, delay=%s", total, args.workers, args.delay)
@@ -214,32 +143,34 @@ def main():
     success_count = 0
     failures = []
     start_time = time.time()
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_case = {
-            executor.submit(
-                execute_registration,
-                case,
-                settings.TEST_ENCRYPT_KEY,
-                args.delay,
-                args.verbose,
-                args.retry,
-                args.retry_delay,
-            ): case
-            for case in test_cases
+    encrypt_key = settings.require_encrypt_key()
+    summary = BatchRunner(finalizer=HttpUtils.close_session).run(
+        test_cases,
+        lambda case: execute_registration(
+            case, encrypt_key, 0, args.verbose, 1, 0
+        ),
+        BatchPolicy(
+            workers=args.workers,
+            attempts=args.retry,
+            delay=args.delay,
+            retry_delay=args.retry_delay,
+        ),
+        succeeded=lambda result: result["ok"],
+    )
+    for item_result in summary.results:
+        result = item_result.result or {
+            "ok": False,
+            "phone": item_result.item["phone_number"],
+            "stage": "exception",
         }
-        for future in as_completed(future_to_case):
-            result = future.result()
-            if result["ok"]:
-                success_count += 1
-            else:
-                failures.append(result)
-                logger.warning("[FAILED] %s stage=%s", result['phone'], result['stage'])
+        if result["ok"]:
+            success_count += 1
+        else:
+            failures.append(result)
+            logger.warning("[FAILED] %s stage=%s", result['phone'], result['stage'])
 
     elapsed = time.time() - start_time
     logger.info("批量注册完成: 成功=%s/%s, 失败=%s, 耗时=%.1fs", success_count, total, len(failures), elapsed)
-
-    # 清理当前线程的 Session 连接
-    HttpUtils.close_session()
 
     if failures:
         logger.warning("失败手机号列表:")
