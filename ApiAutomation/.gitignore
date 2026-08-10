@@ -56,3 +56,4 @@ Thumbs.db
 # =========================
 reports/
 data/*credentials*.json
+jmeter/results/

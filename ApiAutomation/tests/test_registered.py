@@ -24,6 +24,15 @@ REGISTER_TEST_PHONE = "13900011111"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def response_status_summary(response):
+    """提取可安全输出的接口状态字段。"""
+    if not isinstance(response, dict):
+        return {"response_type": type(response).__name__}
+
+    status_fields = ("code", "stayCode", "success", "stayIsSuccess", "status")
+    return {field: response[field] for field in status_fields if field in response}
+
+
 def load_phones_from_csv():
     """从 CSV 文件加载注册手机号列表。"""
     data_file = PROJECT_ROOT / "data" / "register_phone.csv"
@@ -250,7 +259,7 @@ def test_send_code_api(request, test_case, encrypt_key):
     time.sleep(3)
     response = send_verification_code(send_code_params, encrypt_key)
 
-    logger.info(f"手机号={test_case['phone_number']}, uniqueId={test_case['uniqueId']}, 响应={response}")
+    logger.info(f"手机号={test_case['phone_number']}, 状态={response_status_summary(response)}")
     assert response is not None
     assert isinstance(response, dict)
     assert ("code" in response) or ("stayCode" in response) or (response.get("stayIsSuccess") is True)
@@ -270,7 +279,10 @@ def test_register_api(request, test_case, encrypt_key):
     )
     time.sleep(3)
     send_code_response = send_verification_code(send_code_params, encrypt_key)
-    logger.info(f"[注册前发码] 手机号={test_case['phone_number']}, uniqueId={test_case['uniqueId']}, 响应={send_code_response}")
+    logger.info(
+        f"[注册前发码] 手机号={test_case['phone_number']}，"
+        f"状态={response_status_summary(send_code_response)}"
+    )
 
     assert send_code_response is not None
     assert isinstance(send_code_response, dict)
@@ -286,15 +298,22 @@ def test_register_api(request, test_case, encrypt_key):
 
     response = register_user(register_params, encrypt_key)
 
-    logger.info(f"[注册请求] 手机号={test_case['phone_number']}, uniqueId={test_case['uniqueId']}, 响应={response}")
+    logger.info(
+        f"[注册请求] 手机号={test_case['phone_number']}，"
+        f"状态={response_status_summary(response)}"
+    )
 
     assert response is not None
     assert isinstance(response, dict)
     assert ("code" in response) or ("stayCode" in response) or (response.get("stayIsSuccess") is True)
 
-    if response.get("code") == 0:
+    if is_api_success(response):
         logger.info(f"手机号 {test_case['phone_number']} 注册成功，uniqueId={test_case['uniqueId']}")
     else:
         error_message = extract_error_message(response)
-        logger.info(f"手机号 {test_case['phone_number']} 注册失败，uniqueId={test_case['uniqueId']}，code={response.get('code')}，message={error_message}")
-        pytest.fail(f"注册失败: code={response.get('code')}, message={error_message}")
+        status_summary = response_status_summary(response)
+        logger.info(
+            f"手机号 {test_case['phone_number']} 注册失败，"
+            f"状态={status_summary}，message={error_message}"
+        )
+        pytest.fail(f"注册失败: status={status_summary}, message={error_message}")

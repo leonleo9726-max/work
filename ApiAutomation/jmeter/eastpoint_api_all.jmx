@@ -5,7 +5,15 @@
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
         <collectionProp name="Arguments.arguments">
-          <elementProp name="scenario" elementType="Argument"><stringProp name="Argument.name">scenario</stringProp><stringProp name="Argument.value">${__P(scenario,login_batch)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_login_batch" elementType="Argument"><stringProp name="Argument.name">run_login_batch</stringProp><stringProp name="Argument.value">${__P(run_login_batch,true)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_register_batch" elementType="Argument"><stringProp name="Argument.name">run_register_batch</stringProp><stringProp name="Argument.value">${__P(run_register_batch,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_send_coin_red_packet" elementType="Argument"><stringProp name="Argument.name">run_send_coin_red_packet</stringProp><stringProp name="Argument.value">${__P(run_send_coin_red_packet,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_send_gift_red_packet" elementType="Argument"><stringProp name="Argument.name">run_send_gift_red_packet</stringProp><stringProp name="Argument.value">${__P(run_send_gift_red_packet,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_receive_red_packet" elementType="Argument"><stringProp name="Argument.name">run_receive_red_packet</stringProp><stringProp name="Argument.value">${__P(run_receive_red_packet,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_coin_then_receive" elementType="Argument"><stringProp name="Argument.name">run_coin_then_receive</stringProp><stringProp name="Argument.value">${__P(run_coin_then_receive,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_gift_then_receive" elementType="Argument"><stringProp name="Argument.name">run_gift_then_receive</stringProp><stringProp name="Argument.value">${__P(run_gift_then_receive,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_send_gift" elementType="Argument"><stringProp name="Argument.name">run_send_gift</stringProp><stringProp name="Argument.value">${__P(run_send_gift,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
+          <elementProp name="run_business_sample" elementType="Argument"><stringProp name="Argument.name">run_business_sample</stringProp><stringProp name="Argument.value">${__P(run_business_sample,false)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
           <elementProp name="protocol" elementType="Argument"><stringProp name="Argument.name">protocol</stringProp><stringProp name="Argument.value">${__P(protocol,https)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
           <elementProp name="host" elementType="Argument"><stringProp name="Argument.name">host</stringProp><stringProp name="Argument.value">${__P(host,api.eastpointtest.com)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
           <elementProp name="projectRoot" elementType="Argument"><stringProp name="Argument.name">projectRoot</stringProp><stringProp name="Argument.value">${__P(projectRoot,E:/python/work/ApiAutomation)}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp>
@@ -90,7 +98,7 @@ def val = { String name, String fallback = '' ->
 }
 def intVal = { String name, int fallback -> Integer.parseInt(val(name, String.valueOf(fallback))) }
 def longVal = { String name, long fallback -> Long.parseLong(val(name, String.valueOf(fallback))) }
-def normalizePath = { String path -> path.replace('\\', '/') }
+def normalizePath = { String path -> path.replace((char)92, (char)47) }
 
 String projectRoot = normalizePath(val('projectRoot', 'E:/python/work/ApiAutomation'))
 String encryptKey = val('encryptKey', 'kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7')
@@ -523,7 +531,7 @@ candidates.find { item ->
         <hashTree/>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: login_batch">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['login_batch','login','all_apis'])}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_login_batch') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -540,7 +548,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: register_batch">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['register_batch','register','all_apis'])}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_register_batch') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -564,7 +572,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: send_coin_red_packet">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['send_coin_red_packet','send_coin','all_apis'])}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_send_coin_red_packet') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -579,7 +587,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: send_gift_red_packet">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['send_gift_red_packet','all_apis'])}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_send_gift_red_packet') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -594,7 +602,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: receive_red_packet">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'receive_red_packet')}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_receive_red_packet') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -609,7 +617,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: coin_then_receive">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'coin_then_receive')}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_coin_then_receive') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -633,7 +641,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: gift_then_receive">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') == 'gift_then_receive')}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_gift_then_receive') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -657,7 +665,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: send_gift">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['send_gift','batch_send_gift','all_apis'])}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_send_gift') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -672,7 +680,7 @@ candidates.find { item ->
         </hashTree>
 
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="Scenario: business_sample">
-          <stringProp name="IfController.condition">${__groovy(vars.get('scenario') in ['business_sample','business','all_apis'])}</stringProp>
+          <stringProp name="IfController.condition">${__groovy(vars.get('run_business_sample') == 'true')}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
