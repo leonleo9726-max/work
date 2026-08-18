@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import random
 import logging
 import threading
 from contextlib import contextmanager
@@ -127,6 +128,8 @@ class HttpUtils:
     MAX_RETRIES = 2         # 最大重试次数
     BACKOFF_FACTOR = 0.5    # 重试退避因子
     TIMEOUT = 30            # 请求超时（秒）
+    BUSINESS_RETRIES = 2
+    BUSINESS_RETRY_CODE = 980003000
 
     @classmethod
     def _get_pool(cls) -> ConnectionPool:
@@ -174,9 +177,14 @@ class HttpUtils:
             session = cls.get_session()
             request_headers = headers.copy() if headers else {}
 
+            if encrypt_key == "":
+                raise ValueError(
+                    "缺少 EASTPOINT_TEST_ENCRYPT_KEY，拒绝发送未加密的业务请求"
+                )
+
             # 如果需要加密
-            if encrypt_key and data:
-                payload = SignUtils.filter_empty_values(data)
+            if encrypt_key:
+                payload = SignUtils.filter_empty_values(data or {})
 
                 # 生成签名
                 if not timestamp:
@@ -194,12 +202,21 @@ class HttpUtils:
                 request_headers['sign'] = sign
 
                 # 发送加密数据
-                response = session.post(
-                    url=url,
-                    data=encrypted_data,
-                    headers=request_headers,
-                    timeout=cls.TIMEOUT,
-                )
+                for attempt in range(cls.BUSINESS_RETRIES + 1):
+                    response = session.post(
+                        url=url,
+                        data=encrypted_data,
+                        headers=request_headers,
+                        timeout=cls.TIMEOUT,
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    if (
+                        not cls._is_business_retry_response(result)
+                        or attempt == cls.BUSINESS_RETRIES
+                    ):
+                        return result
+                    time.sleep(random.uniform(0.5, 1.5))
             else:
                 # 发送未加密数据
                 response = session.post(
@@ -208,9 +225,15 @@ class HttpUtils:
                     headers=request_headers,
                     timeout=cls.TIMEOUT,
                 )
-
-            response.raise_for_status()
-            return response.json()
+                response.raise_for_status()
+                return response.json()
         except requests.RequestException as e:
             logger.error("POST请求失败: url=%s, error=%s", url, e)
             return None
+
+    @classmethod
+    def _is_business_retry_response(cls, response) -> bool:
+        if not isinstance(response, dict):
+            return False
+        code = response.get("stayCode", response.get("code"))
+        return str(code) == str(cls.BUSINESS_RETRY_CODE)

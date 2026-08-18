@@ -27,27 +27,30 @@ def is_api_success(response: Any) -> bool:
     if not isinstance(response, dict):
         return False
 
-    # 检查 stayCode
+    checks = []
+
+    # A response family may expose one, two, or all success indicators. When an
+    # indicator is present, it must agree with the others rather than allowing a
+    # successful code to mask an explicit failure flag.
     stay_code = response.get("stayCode")
-    if stay_code in (0, "0", 200, "200"):
-        return True
+    if stay_code is not None:
+        checks.append(stay_code in (0, "0", 200, "200"))
 
-    # 检查 stayIsSuccess
-    if response.get("stayIsSuccess") is True:
-        return True
+    if "stayIsSuccess" in response:
+        checks.append(response["stayIsSuccess"] is True)
 
-    # 检查 code
     code = response.get("code")
-    if code in (0, "0", 200, "200"):
-        return True
+    if code is not None:
+        checks.append(code in (0, "0", 200, "200"))
 
-    # 检查 success
-    if response.get("success") is True:
-        return True
+    if "success" in response:
+        checks.append(response["success"] is True)
 
-    # 检查 status
-    if response.get("status") in ("success", "ok", "SUCCESS", "OK"):
-        return True
+    if "status" in response:
+        checks.append(response["status"] in ("success", "ok", "SUCCESS", "OK"))
+
+    if checks:
+        return all(checks)
 
     # 检查 data 中是否包含 token
     data = response.get("data")

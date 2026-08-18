@@ -1,7 +1,11 @@
 """Centralized project settings for API automation."""
 
-BASE_URL = "https://api.eastpointtest.com"
-TEST_ENCRYPT_KEY = "kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7"
+import os
+
+
+BASE_URL = os.getenv("EASTPOINT_BASE_URL", "https://api.eastpointtest.com").rstrip("/")
+# An empty value is intentional: HttpUtils rejects it when encrypted transport is requested.
+TEST_ENCRYPT_KEY = os.getenv("EASTPOINT_TEST_ENCRYPT_KEY", "")
 
 DEFAULT_HEADERS = {
     "content-type": "application/json",
@@ -21,10 +25,10 @@ LOGIN_PHONE_PATH = "/user/stay/login/password"
 
 # Login-related defaults — populated at runtime or via env vars.
 # These are examples only; production credentials must come from secure storage.
-LOGIN_USER_INFO = ""
-LOGIN_LANGUAGE_CODE = "en"
-LOGIN_TOKEN = ""
-LOGIN_PLATFORM = "android"
+LOGIN_USER_INFO = os.getenv("EASTPOINT_LOGIN_USER_INFO", "")
+LOGIN_LANGUAGE_CODE = os.getenv("EASTPOINT_LOGIN_LANGUAGE_CODE", "en")
+LOGIN_TOKEN = os.getenv("EASTPOINT_LOGIN_TOKEN", "")
+LOGIN_PLATFORM = os.getenv("EASTPOINT_LOGIN_PLATFORM", "android")
 
 
 def build_common_encrypted_headers():

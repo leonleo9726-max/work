@@ -7,7 +7,7 @@
 
 import json
 import base64
-import time
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +29,7 @@ BATCH_LOGIN_CREDENTIALS_FILE = PROJECT_ROOT / "data" / "batch_login_credentials.
 
 # 内存中的登录凭证缓存
 _LOGIN_CREDENTIALS: dict = {}
+_CREDENTIALS_LOCK = threading.RLock()
 
 
 def _ensure_credentials_file():
@@ -39,22 +40,30 @@ def _ensure_credentials_file():
 
 def save_login_credentials_to_json():
     """将内存中的登录凭证持久化到 JSON 文件。"""
-    _ensure_credentials_file()
-    with LOGIN_CREDENTIALS_FILE.open("w", encoding="utf-8") as file:
-        json.dump(_LOGIN_CREDENTIALS, file, ensure_ascii=False, indent=2)
+    with _CREDENTIALS_LOCK:
+        _ensure_credentials_file()
+        temporary_file = LOGIN_CREDENTIALS_FILE.with_suffix(".json.tmp")
+        try:
+            with temporary_file.open("w", encoding="utf-8") as file:
+                json.dump(_LOGIN_CREDENTIALS, file, ensure_ascii=False, indent=2)
+            temporary_file.replace(LOGIN_CREDENTIALS_FILE)
+        finally:
+            if temporary_file.exists():
+                temporary_file.unlink()
 
 
 def load_login_credentials_from_json() -> dict:
     """从 JSON 文件加载登录凭证到内存。"""
-    if not LOGIN_CREDENTIALS_FILE.exists():
-        return {}
-    try:
-        with LOGIN_CREDENTIALS_FILE.open("r", encoding="utf-8") as file:
-            data = json.load(file) or {}
-            _LOGIN_CREDENTIALS.update(data)
-            return data
-    except (json.JSONDecodeError, IOError):
-        return {}
+    with _CREDENTIALS_LOCK:
+        if not LOGIN_CREDENTIALS_FILE.exists():
+            return {}
+        try:
+            with LOGIN_CREDENTIALS_FILE.open("r", encoding="utf-8") as file:
+                data = json.load(file) or {}
+                _LOGIN_CREDENTIALS.update(data)
+                return data
+        except (json.JSONDecodeError, IOError):
+            return {}
 
 
 def store_login_credentials(phone_number: str, login_info: dict):
@@ -70,21 +79,20 @@ def store_login_credentials(phone_number: str, login_info: dict):
     if not login_info:
         return
 
-    user_id = login_info["stayUserId"]
-    token = login_info["stayToken"]
+    with _CREDENTIALS_LOCK:
+        user_id = login_info["stayUserId"]
+        token = login_info["stayToken"]
 
-    existing = _LOGIN_CREDENTIALS.get(user_id)
-    if existing and existing["stayToken"] != token:
-        raise AssertionError(
-            f"用户ID {user_id} 已存在不同 token：{existing['stayToken']} vs {token}"
-        )
+        existing = _LOGIN_CREDENTIALS.get(user_id)
+        if existing and existing["stayToken"] != token:
+            raise AssertionError(f"用户ID {user_id} 已存在不同 token")
 
-    _LOGIN_CREDENTIALS[user_id] = {
-        "phone_number": phone_number,
-        "stayUserId": user_id,
-        "stayToken": token,
-    }
-    save_login_credentials_to_json()
+        _LOGIN_CREDENTIALS[user_id] = {
+            "phone_number": phone_number,
+            "stayUserId": user_id,
+            "stayToken": token,
+        }
+        save_login_credentials_to_json()
 
 
 def get_login_credentials_by_user_id(stay_user_id: str) -> Optional[dict]:
@@ -228,19 +236,13 @@ def create_login_phone_params(
 
 def login_with_phone(payload: dict, encrypt_key: str) -> Optional[dict]:
     """调用手机号密码登录接口。"""
-    from common.http_utils import HttpUtils
+    from common.api_client import EastPointClient
 
     locale = str(payload.get("language", "en"))
-    timestamp = str(int(time.time() * 1000))
-    url = f"{settings.BASE_URL}{LOGIN_PHONE_PATH}"
-    headers = settings.build_common_encrypted_headers()
-    return HttpUtils.post(
-        url=url,
-        data=payload,
-        headers=headers,
-        encrypt_key=encrypt_key,
+    return EastPointClient(encrypt_key).post(
+        path=LOGIN_PHONE_PATH,
+        payload=payload,
         locale=locale,
-        timestamp=timestamp,
     )
 
 

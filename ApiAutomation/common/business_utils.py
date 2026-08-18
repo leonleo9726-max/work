@@ -2,7 +2,7 @@
 
 import json
 import logging
-from config import settings
+from common.auth_utils import build_business_headers
 from common.response_utils import (
     extract_error_details as _extract_error_details,
     extract_stay_red_packet_id as _extract_stay_red_packet_id,
@@ -20,13 +20,6 @@ def is_success(response):
 def get_error_details(response):
     """从响应中提取错误信息"""
     return _extract_error_details(response)
-
-
-def build_business_headers(stay_token):
-    """构建业务请求头（含 token 认证）"""
-    headers = settings.build_common_encrypted_headers()
-    headers["token"] = stay_token
-    return headers
 
 
 def extract_stay_red_packet_id(response):

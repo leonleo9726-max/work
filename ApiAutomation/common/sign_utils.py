@@ -6,9 +6,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
 
 class SignUtils:
-    # Keep class-level key for backward compatibility.
-    test_encrypt_key = "kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7"
-
     @staticmethod
     def filter_empty_values(data):
         """过滤空值"""
@@ -87,6 +84,3 @@ class SignUtils:
         sha256 = hashlib.sha256()
         sha256.update(sign_string.encode('utf-8'))
         return sha256.hexdigest().lower()
-
-# 测试环境key
-test_encrypt_key = "kGJGJBTNcPI3t0NnWWe60hOcKXuxpyo7"

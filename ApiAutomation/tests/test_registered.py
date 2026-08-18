@@ -14,9 +14,8 @@ import pytest
 
 # conftest.py 已处理 sys.path
 from common.api_paths import REGISTER_PATH, SEND_CODE_PATH
-from common.http_utils import HttpUtils
+from common.api_client import EastPointClient
 from common.response_utils import extract_error_message, is_api_success
-from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -89,16 +88,7 @@ TEST_CASES = create_balanced_random_allocation()
 def send_verification_code(params, encrypt_key):
     """发送验证码"""
     try:
-        url = f"{settings.BASE_URL}{SEND_CODE_PATH}"
-        headers = settings.build_common_encrypted_headers()
-
-        response = HttpUtils.post(
-            url=url,
-            data=params,
-            headers=headers,
-            encrypt_key=encrypt_key,
-        )
-        return response
+        return EastPointClient(encrypt_key).post(SEND_CODE_PATH, params)
     except Exception as e:
         logger.error(f"发送验证码失败: {e}")
         return {'code': 500, 'message': f'服务器内部错误: {str(e)}'}
@@ -173,16 +163,7 @@ def create_register_params(phone_number, area_code="86", verification_code="", *
 def register_user(params, encrypt_key):
     """注册用户"""
     try:
-        url = f"{settings.BASE_URL}{REGISTER_PATH}"
-        headers = settings.build_common_encrypted_headers()
-
-        response = HttpUtils.post(
-            url=url,
-            data=params,
-            headers=headers,
-            encrypt_key=encrypt_key,
-        )
-        return response
+        return EastPointClient(encrypt_key).post(REGISTER_PATH, params)
     except Exception as e:
         logger.error(f"注册失败: {e}")
         return {'code': 500, 'message': f'服务器内部错误: {str(e)}'}
@@ -262,7 +243,7 @@ def test_send_code_api(request, test_case, encrypt_key):
     logger.info(f"手机号={test_case['phone_number']}, 状态={response_status_summary(response)}")
     assert response is not None
     assert isinstance(response, dict)
-    assert ("code" in response) or ("stayCode" in response) or (response.get("stayIsSuccess") is True)
+    assert is_api_success(response), f"发码失败: {response_status_summary(response)}"
 
 
 @pytest.mark.api
@@ -286,7 +267,9 @@ def test_register_api(request, test_case, encrypt_key):
 
     assert send_code_response is not None
     assert isinstance(send_code_response, dict)
-    assert ("code" in send_code_response) or ("stayCode" in send_code_response) or (send_code_response.get("stayIsSuccess") is True)
+    assert is_api_success(send_code_response), (
+        f"发码失败: {response_status_summary(send_code_response)}"
+    )
 
     # 注册用户
     verification_code = "8888"
@@ -305,7 +288,7 @@ def test_register_api(request, test_case, encrypt_key):
 
     assert response is not None
     assert isinstance(response, dict)
-    assert ("code" in response) or ("stayCode" in response) or (response.get("stayIsSuccess") is True)
+    assert is_api_success(response), f"注册失败: {response_status_summary(response)}"
 
     if is_api_success(response):
         logger.info(f"手机号 {test_case['phone_number']} 注册成功，uniqueId={test_case['uniqueId']}")
