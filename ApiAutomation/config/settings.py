@@ -1,7 +1,12 @@
 """Centralized project settings for API automation."""
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BASE_URL = os.getenv("EASTPOINT_BASE_URL", "https://api.eastpointtest.com").rstrip("/")
 # An empty value is intentional: HttpUtils rejects it when encrypted transport is requested.
