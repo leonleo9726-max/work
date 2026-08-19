@@ -13,6 +13,7 @@ from common.api_paths import BUSINESS_SAMPLE_PATH
 from common.api_client import EastPointClient
 from common.auth_utils import build_business_headers_from_login
 from common.response_utils import is_api_success
+from config import settings
 
 logger = logging.getLogger(__name__)
 
