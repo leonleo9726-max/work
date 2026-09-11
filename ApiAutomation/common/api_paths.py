@@ -34,7 +34,13 @@ RECEIVE_RED_PACKET_PATH = "/payer/redPacket/receive"
 # 礼物相关
 # ============================================================
 
-BATCH_SEND_GIFT_PATH = "/live/stay/gift/batch-send"
+LIVE_HEARTBEAT_PATH = "/live/heartbeat"
+"""直播间心跳"""
+
+JOIN_PARTY_MEMBER_PATH = "/live/stay/party/members/join"
+"""加入派对房间成员"""
+
+BATCH_SEND_GIFT_PATH = "/gift/batch-send"
 """批量发送礼物"""
 
 # ============================================================

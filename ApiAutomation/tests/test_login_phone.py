@@ -1,7 +1,7 @@
 """
 手机登录测试模块。
 
-提供手机号密码登录的测试用例和辅助函数。
+提供手机号验证码和密码登录的测试用例和辅助函数。
 登录凭证管理已统一迁移至 common/auth_utils.py。
 """
 
@@ -14,8 +14,14 @@ from pathlib import Path
 
 import pytest
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from common.auth_utils import (
+    create_phone_login_params,
     create_login_phone_params,
+    login_with_verification_code,
     login_with_phone,
     store_login_credentials,
 )
@@ -24,7 +30,6 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOGIN_CREDENTIALS_FILE = PROJECT_ROOT / "data" / "login_credentials.json"
 
 
@@ -39,6 +44,8 @@ def parse_args():
                         help="区号，默认: 86")
     parser.add_argument("--password", type=str, default="a123456",
                         help="密码，默认: a123456（会自动进行base64编码）")
+    parser.add_argument("--login-mode", choices=("password", "phone"), default="password",
+                        help="登录方式：password 或 phone（验证码登录）")
     parser.add_argument("--run-api", action="store_true",
                         help="执行真实API测试（需要此参数才会调用接口）")
     parser.add_argument("--verbose", action="store_true",
@@ -88,30 +95,62 @@ def test_create_login_phone_params_contains_required_fields():
     assert payload["password"] == "YTEyMzQ1Ng=="
 
 
+def test_create_phone_login_params_contains_required_fields():
+    payload = create_phone_login_params(
+        phone_number="13800138000",
+        verification_code="8888",
+        area_code="86",
+        unique_id="test-device-id",
+    )
+
+    assert payload["stayPhoneNumber"] == "13800138000"
+    assert payload["stayVerificationCode"] == "8888"
+    assert payload["stayAreaCode"] == "86"
+    assert payload["stayUniqueId"] == "test-device-id"
+    assert payload["stayLoginType"] == 3
+    assert payload["stayLoginPwdType"] == 1
+    assert "password" not in payload
+
+
+def build_login_payload(login_mode, phone_number, verification_code, area_code, password):
+    """根据选择的登录方式构造相应接口的业务载荷。"""
+    if login_mode == "phone":
+        return create_phone_login_params(
+            phone_number=phone_number,
+            verification_code=verification_code,
+            area_code=area_code,
+        )
+    return create_login_phone_params(
+        phone_number=phone_number,
+        verification_code=verification_code,
+        area_code=area_code,
+        password=password,
+    )
+
+
+def execute_login(login_mode, payload, encrypt_key):
+    """将业务载荷发送至所选登录接口。"""
+    if login_mode == "phone":
+        return login_with_verification_code(payload, encrypt_key)
+    return login_with_phone(payload, encrypt_key)
+
+
 @pytest.mark.api
 def test_login_phone_api_single(request, encrypt_key):
     """单用户登录测试，支持命令行参数"""
     if not request.config.getoption("--run-api"):
         pytest.skip("need --run-api option to execute real API tests")
 
-    # 解析命令行参数
-    args = parse_args()
-    phone_number = args.phone
-    verification_code = args.code
-    area_code = args.area
-    password = args.password
-    verbose = args.verbose
+    login_mode = request.config.getoption("--login-mode")
+    phone_number = request.config.getoption("--phone")
+    verification_code = request.config.getoption("--code")
+    area_code = request.config.getoption("--area")
+    password = request.config.getoption("--password")
 
-    if verbose:
-        logger.info(f"phone={phone_number}, code={verification_code}, area={area_code}, password={password}")
-
-    payload = create_login_phone_params(
-        phone_number=phone_number,
-        verification_code=verification_code,
-        area_code=area_code,
-        password=password,
+    payload = build_login_payload(
+        login_mode, phone_number, verification_code, area_code, password
     )
-    response = login_with_phone(payload, encrypt_key)
+    response = execute_login(login_mode, payload, encrypt_key)
 
     assert response is not None
     assert isinstance(response, dict)
@@ -146,8 +185,9 @@ def test_login_phone_api_batch(request, encrypt_key, phone_number):
     if not request.config.getoption("--run-api"):
         pytest.skip("need --run-api option to execute real API tests")
 
-    payload = create_login_phone_params(phone_number=phone_number)
-    response = login_with_phone(payload, encrypt_key)
+    login_mode = request.config.getoption("--login-mode")
+    payload = build_login_payload(login_mode, phone_number, "8888", "86", "a123456")
+    response = execute_login(login_mode, payload, encrypt_key)
 
     assert response is not None
     assert isinstance(response, dict)
@@ -175,28 +215,34 @@ def test_login_phone_api_batch(request, encrypt_key, phone_number):
     time.sleep(2)
 
 
-def _build_debug_payload(phone=None, code=None, area=None, password=None):
+def _build_debug_payload(login_mode, phone=None, code=None, area=None, password=None):
     """右上角直接运行文件时，复用同一套测试参数。"""
-    return create_login_phone_params(
-        phone_number=phone or "15200711073",
-        verification_code=code or "8888",
-        area_code=area or "86",
-        password=password or "a123456",
+    return build_login_payload(
+        login_mode,
+        phone or "15200711073",
+        code or "8888",
+        area or "86",
+        password or "a123456",
     )
 
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
+
     args = parse_args()
-    logger.info(f"phone={args.phone}, code={args.code}, area={args.area}, password={args.password}, run-api={args.run_api}, verbose={args.verbose}")
+    logger.info(f"phone={args.phone}, login_mode={args.login_mode}, run-api={args.run_api}, verbose={args.verbose}")
 
     if not args.run_api:
         print("警告: 需要 --run-api 参数才会执行真实API测试")
-        print("示例: python tests/test_login_phone.py --run-api --phone 15200711073 --code 8888 --area 86 --password a123456")
+        print("示例: python tests/test_login_phone.py --run-api --login-mode phone --phone 15200711073 --code 8888 --area 86")
         sys.exit(0)
 
-    payload = _build_debug_payload(phone=args.phone, code=args.code, area=args.area, password=args.password)
+    payload = _build_debug_payload(args.login_mode, phone=args.phone, code=args.code, area=args.area, password=args.password)
     print("[login_phone][debug] direct run mode enabled")
-    response = login_with_phone(payload, settings.TEST_ENCRYPT_KEY)
+    response = execute_login(args.login_mode, payload, settings.TEST_ENCRYPT_KEY)
     print(f"[login_phone] 响应: {response}")
     print(f"[login_phone] 登录结果: success={_is_login_success(response)}")
     

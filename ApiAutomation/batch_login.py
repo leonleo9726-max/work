@@ -10,7 +10,6 @@ import logging
 import random
 import sys
 import time
-import base64
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -18,8 +17,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, OSError):
+    pass
+
 from common.http_utils import HttpUtils
-from common.business_utils import is_success, get_error_details
+from common.auth_utils import create_login_phone_params, login_with_phone
+from common.response_utils import extract_error_details, extract_login_info, is_api_success
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -43,7 +48,7 @@ def load_csv_values(data_file: Path, field_name: str):
         reader = csv.DictReader(file)
         for row in reader:
             value = (row.get(field_name) or "").strip()
-            if value:
+            if value and not value.startswith("#"):
                 values.append(value)
     return values
 
@@ -63,56 +68,6 @@ def allocate_unique_ids(phones, unique_ids):
     return test_cases
 
 
-def _to_base64(value):
-    """将字符串转为base64编码"""
-    if value is None:
-        return None
-    return base64.b64encode(str(value).encode("utf-8")).decode("utf-8")
-
-
-def create_login_params(phone_number, unique_id, verification_code="8888", area_code="86", password="a123456"):
-    """创建登录参数"""
-    params = {
-        "platformType": 0,
-        "appType": 0,
-        "variantType": 0,
-        "appVersion": "2.1.4",
-        "buildVersion": 317,
-        "osModel": "V2278A",
-        "osVersion": "13",
-        "language": "en",
-        "uniqueId": unique_id,
-        "uuid": "9fcd8047c27442138fdbdcddcb026ebd",
-        "deviceId": "be825900787d419f9872eed48566f45c",
-        "widevineId": None,
-        "idfv": None,
-        "idfa": None,
-        "mcc": None,
-        "mnc": None,
-        "networkName": None,
-        "inviteCode": None,
-        "downloadChannel": None,
-        "ipAddress": "41.235.64.230",
-        "remoteIp": "41.235.64.230",
-        "languageCountry": "en",
-        "appLanguage": "en",
-        "areaCode": area_code,
-        "phoneNumber": phone_number,
-        "verificationCode": verification_code,
-        "captchaType": 0,
-        "loginPwdType": 0,
-        "password": _to_base64(password),
-        "tablet": 0,
-        "simulator": 0,
-        "useVpn": 0,
-        "useRoot": 0,
-        "useDebug": 0,
-        "mockLocation": 0,
-        "timezone": "Asia/Shanghai",
-    }
-    return params
-
-
 def is_network_error(response):
     """检查是否为网络不可用错误（980003000+100087），需要特殊重试处理。"""
     if not isinstance(response, dict):
@@ -121,39 +76,10 @@ def is_network_error(response):
             and "100087" in str(response.get("stayErrorMessage", "")))
 
 
-def extract_login_info(response):
-    """从登录响应中提取用户信息"""
-    if not isinstance(response, dict):
-        return None
-
-    candidates = []
-    if isinstance(response.get("stayResult"), dict):
-        candidates.append(response["stayResult"])
-    if isinstance(response.get("data"), dict):
-        candidates.append(response["data"])
-    candidates.append(response)
-
-    for data in candidates:
-        if not isinstance(data, dict):
-            continue
-        stay_user_id = data.get("stayUserId")
-        stay_token = data.get("stayToken")
-        if stay_user_id and stay_token:
-            return {
-                "stayUserId": str(stay_user_id),
-                "stayToken": str(stay_token),
-            }
-    return None
-
-
-
 def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_delay=1.0, jitter=0.3):
     """执行单个登录任务"""
     phone_number = test_case["phone_number"]
     unique_id = test_case["uniqueId"]
-    headers = settings.build_common_encrypted_headers()
-    login_url = f"{settings.BASE_URL}{settings.LOGIN_PHONE_PATH}"
-
     last_failure = None
     for attempt in range(1, retry + 1):
         if delay and delay > 0:
@@ -164,15 +90,13 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
         if verbose and attempt > 1:
             logger.info("[RETRY %s/%s] %s", attempt, retry, phone_number)
 
-        login_payload = create_login_params(phone_number, unique_id)
-        login_response = HttpUtils.post(
-            url=login_url,
-            data=login_payload,
-            headers=headers,
-            encrypt_key=encrypt_key,
+        login_payload = create_login_phone_params(
+            phone_number=phone_number,
+            uniqueId=unique_id,
         )
+        login_response = login_with_phone(login_payload, encrypt_key)
 
-        if not is_network_error(login_response) and is_success(login_response):
+        if not is_network_error(login_response) and is_api_success(login_response):
             login_info = extract_login_info(login_response)
             if verbose:
                 if login_info:
@@ -187,7 +111,7 @@ def execute_login(test_case, encrypt_key, delay, verbose=False, retry=1, retry_d
             }
 
         # 提取错误详情
-        error_details = get_error_details(login_response)
+        error_details = extract_error_details(login_response)
         
         last_failure = {
             "phone": phone_number,
@@ -224,10 +148,18 @@ def main():
     parser.add_argument("--start-index", type=int, default=0, help="从第几个手机号开始登录，默认0")
     parser.add_argument("--max-count", type=int, default=0, help="最多登录多少个手机号，默认0表示全部")
     parser.add_argument("--save-credentials", action="store_true", help="是否保存登录凭证到JSON文件")
+    parser.add_argument("--run-api", action="store_true", help="确认执行真实登录请求")
     args = parser.parse_args()
 
     # 配置日志
     configure_logging(args.verbose)
+
+    if not args.run_api:
+        logger.error("拒绝执行真实登录；请明确添加 --run-api")
+        return 2
+    if not settings.TEST_ENCRYPT_KEY:
+        logger.error("缺少 EASTPOINT_TEST_ENCRYPT_KEY，无法发送加密登录请求")
+        return 2
 
     # 加载手机号和设备ID
     phones = load_csv_values(PROJECT_ROOT / "data" / "login_phone.csv", "phone_number")
@@ -311,4 +243,4 @@ def main():
 # --save-credentials：保存登录凭证到JSON文件
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 BASE_URL = os.getenv("EASTPOINT_BASE_URL", "https://api.eastpointtest.com").rstrip("/")
+LIVE_BASE_URL = os.getenv(
+    "EASTPOINT_LIVE_BASE_URL", "https://internal.eastpointtest.com:30082/live"
+).rstrip("/")
 # An empty value is intentional: HttpUtils rejects it when encrypted transport is requested.
 TEST_ENCRYPT_KEY = os.getenv("EASTPOINT_TEST_ENCRYPT_KEY", "")
 
@@ -39,6 +42,21 @@ LOGIN_PLATFORM = os.getenv("EASTPOINT_LOGIN_PLATFORM", "android")
 def build_common_encrypted_headers():
     headers = DEFAULT_HEADERS.copy()
     headers["app-language"] = headers["appLanguage"]
+    return headers
+
+
+def build_live_service_headers():
+    """构建直播服务请求使用的设备与地域请求头。"""
+    headers = build_common_encrypted_headers()
+    headers.update(
+        {
+            "locale": "zh",
+            "appLanguage": "zh-CN",
+            "app-language": "zh-CN",
+            "build-version": "335",
+            "client-ip-address": "127.0.0.1",
+        }
+    )
     return headers
 
 

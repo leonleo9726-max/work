@@ -17,8 +17,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, OSError):
+    pass
+
 from common.http_utils import HttpUtils
-from common.business_utils import is_success
+from common.response_utils import is_api_success
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -41,7 +46,7 @@ def load_csv_values(data_file: Path, field_name: str):
         reader = csv.DictReader(file)
         for row in reader:
             value = (row.get(field_name) or "").strip()
-            if value:
+            if value and not value.startswith("#"):
                 values.append(value)
     return values
 
@@ -58,7 +63,7 @@ def allocate_unique_ids(phones, unique_ids):
     return test_cases
 
 
-def create_send_code_params(phone_number, unique_id, area_code="86", user_sms_type=0):
+def create_send_code_params(phone_number, unique_id, area_code="93", user_sms_type=0):
     params = {
         "platformType": 0,
         "appType": 0,
@@ -79,7 +84,7 @@ def create_send_code_params(phone_number, unique_id, area_code="86", user_sms_ty
     return params
 
 
-def create_register_params(phone_number, unique_id, verification_code="8888", area_code="86"):
+def create_register_params(phone_number, unique_id, verification_code="8888", area_code="93"):
     params = {
         "platformType": 0,
         "appType": 0,
@@ -144,7 +149,7 @@ def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, 
             encrypt_key=encrypt_key,
         )
 
-        if not is_success(send_response):
+        if not is_api_success(send_response):
             last_failure = {
                 "phone": phone_number,
                 "ok": False,
@@ -164,7 +169,7 @@ def execute_registration(test_case, encrypt_key, delay, verbose=False, retry=1, 
             encrypt_key=encrypt_key,
         )
 
-        if is_success(register_response):
+        if is_api_success(register_response):
             if verbose:
                 logger.info("[OK] %s", phone_number)
             return {"phone": phone_number, "ok": True}
@@ -190,10 +195,14 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="是否打印每条成功日志")
     parser.add_argument("--start-index", type=int, default=0, help="从第几个手机号开始注册，默认0")
     parser.add_argument("--max-count", type=int, default=0, help="最多注册多少个手机号，默认0表示全部")
+    parser.add_argument("--run-api", action="store_true", help="确认执行真实注册请求")
     args = parser.parse_args()
 
     # 配置日志
     configure_logging(args.verbose)
+    if not args.run_api:
+        logger.error("拒绝执行真实注册；请明确添加 --run-api")
+        raise SystemExit(2)
 
     phones = load_csv_values(PROJECT_ROOT / "data" / "register_phone.csv", "phone_number")
     unique_ids = load_csv_values(PROJECT_ROOT / "data" / "device_ids.csv", "uniqueId")

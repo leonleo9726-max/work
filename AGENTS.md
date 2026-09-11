@@ -10,7 +10,8 @@
 ## 2. 项目规约
 
 - 业务领域：直播/社交平台 API 自动化测试，技术栈为 Python、pytest、requests、cryptography 与 Pandas。
-- 所有业务请求使用 AES-CBC 加密与 SHA-256 签名。`config/settings.py` 从环境变量读取 `EASTPOINT_BASE_URL` 与 `EASTPOINT_TEST_ENCRYPT_KEY`；密钥缺失时不得降级为明文请求。
+- 业务请求默认使用 AES-CBC 加密与 SHA-256 签名。`config/settings.py` 从环境变量读取 `EASTPOINT_BASE_URL` 与 `EASTPOINT_TEST_ENCRYPT_KEY`；除受控明文例外外，密钥缺失时不得降级为明文请求。
+- 测试环境的 `BATCH_SEND_GIFT_PATH`（直播批量送礼）与 `LIVE_HEARTBEAT_PATH`（直播心跳）为受控明文 JSON 例外，分别通过 `common.live_gift.post_live_gift()` 和 `common.live_heartbeat.post_live_heartbeat()` 发送。该例外只适用于这两个路径；新增或修改其他业务路径时，仍必须使用加密和签名传输。
 - `common/sign_utils.py` 负责过滤空值、`stay*` 键转换、签名和加密；`common/http_utils.py` 负责传输与 `980003000` 的 0.5-1.5 秒抖动重试。
 - 业务调用优先使用 `common.api_client.EastPointClient`，测试与批量脚本只声明业务路径、载荷和凭证。
 - `data/login_credentials.json` 与 `data/batch_login_credentials.json` 只保存本地运行凭证，已被 Git 忽略；不得重新加入版本控制。
@@ -24,7 +25,7 @@
 - 全部真实接口测试：`pytest -m api --run-api`
 - 单文件调试：`pytest tests/test_login_phone.py --run-api -s`
 - 批量登录：`${PYTHON_EXE} batch_login.py --workers 3 --save-credentials`
-- 批量发/领红包：`${PYTHON_EXE} batch_receive_red_packet.py --send-coin --workers 5`
+- 批量发/领红包：`${PYTHON_EXE} batch_receive_red_packet.py --send-coin --workers 5 --run-api`
 
 ## 4. 请求与断言
 

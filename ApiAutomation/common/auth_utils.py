@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from common.api_paths import LOGIN_PHONE_PATH
+from common.api_paths import LOGIN_PHONE_PATH, REGISTER_PATH
 from common.response_utils import extract_error_message, extract_login_info, is_api_success
 from config import settings
 
@@ -234,6 +234,49 @@ def create_login_phone_params(
     return params
 
 
+def create_phone_login_params(
+    phone_number: str = "15200711073",
+    verification_code: str = "8888",
+    area_code: str = "86",
+    unique_id: str = "bac1131e82cd4c738e3199375ffe77b4",
+    **kwargs,
+) -> dict:
+    """创建手机号验证码登录参数。"""
+    params = {
+        "stayPlatformType": 0,
+        "stayAppType": 0,
+        "stayVariantType": 0,
+        "stayAppVersion": "2.3.0",
+        "stayBuildVersion": 337,
+        "stayOsModel": "25028RN03A",
+        "stayOsVersion": "15",
+        "stayLanguage": "zh",
+        "stayUniqueId": unique_id,
+        "stayUuid": "94e8b75714fa4d598ffe8034627e0ac6",
+        "stayGaid": "80a2332e-1dfd-41c9-b4d9-7e4b0331ddd0",
+        "stayDeviceId": "04a8c2a395d84be7",
+        "stayWidevineId": "3b66f9bd6a7c4af5a6afd6ab85256dced794e942f469a478a26c07c15bc726c2",
+        "stayIdfv": "29e6354a9191b3710bc4272072c97e474",
+        "stayTablet": 0,
+        "staySimulator": 0,
+        "stayUseVpn": 0,
+        "stayUseRoot": 0,
+        "stayUseDebug": 1,
+        "stayMockLocation": 0,
+        "stayTimezone": "Asia/Shanghai",
+        "stayLanguageCountry": "US",
+        "stayLoginType": 3,
+        "stayAppLanguage": "en",
+        "stayAreaCode": area_code,
+        "stayPhoneNumber": phone_number,
+        "stayVerificationCode": verification_code,
+        "stayLoginPwdType": 1,
+        "stayCaptchaType": 0,
+    }
+    params.update(kwargs)
+    return params
+
+
 def login_with_phone(payload: dict, encrypt_key: str) -> Optional[dict]:
     """调用手机号密码登录接口。"""
     from common.api_client import EastPointClient
@@ -241,6 +284,18 @@ def login_with_phone(payload: dict, encrypt_key: str) -> Optional[dict]:
     locale = str(payload.get("language", "en"))
     return EastPointClient(encrypt_key).post(
         path=LOGIN_PHONE_PATH,
+        payload=payload,
+        locale=locale,
+    )
+
+
+def login_with_verification_code(payload: dict, encrypt_key: str) -> Optional[dict]:
+    """调用手机号验证码登录接口。"""
+    from common.api_client import EastPointClient
+
+    locale = str(payload.get("stayLanguage", "zh"))
+    return EastPointClient(encrypt_key).post(
+        path=REGISTER_PATH,
         payload=payload,
         locale=locale,
     )

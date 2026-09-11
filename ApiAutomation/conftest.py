@@ -23,6 +23,32 @@ def pytest_addoption(parser):
         default=False,
         help="run tests that call external APIs",
     )
+    parser.addoption(
+        "--login-mode",
+        choices=("password", "phone"),
+        default="password",
+        help="login mode for tests/test_login_phone.py",
+    )
+    parser.addoption(
+        "--phone",
+        default="15200711073",
+        help="phone number for tests/test_login_phone.py",
+    )
+    parser.addoption(
+        "--code",
+        default="8888",
+        help="verification code for tests/test_login_phone.py",
+    )
+    parser.addoption(
+        "--area",
+        default="86",
+        help="area code for tests/test_login_phone.py",
+    )
+    parser.addoption(
+        "--password",
+        default="a123456",
+        help="password for tests/test_login_phone.py",
+    )
 
 
 @pytest.fixture(scope="session")

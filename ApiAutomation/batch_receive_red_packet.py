@@ -22,8 +22,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, OSError):
+    pass
+
 from common.http_utils import HttpUtils
-from common.business_utils import is_success, get_error_details, build_business_headers, extract_stay_red_packet_id
+from common.auth_utils import build_business_headers
+from common.response_utils import extract_error_details, extract_stay_red_packet_id, is_api_success
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -147,7 +153,7 @@ def execute_receive_red_packet(credential, red_packet_id, delay, verbose=False, 
             timestamp=str(int(time.time() * 1000)),
         )
 
-        if is_success(response):
+        if is_api_success(response):
             if verbose:
                 logger.info("[OK] %s (ID: %s) - 抢红包成功", phone_number, stay_user_id)
             return {
@@ -158,7 +164,7 @@ def execute_receive_red_packet(credential, red_packet_id, delay, verbose=False, 
             }
 
         # 提取错误详情
-        error_details = get_error_details(response)
+        error_details = extract_error_details(response)
         
         # 检查是否为红包已抢完或重复抢的错误
         if is_red_packet_exhausted(response):
@@ -224,8 +230,8 @@ def execute_send_coin_only(credential, room_id, amount, count, condition, distri
             timestamp=str(int(time.time() * 1000)),
         )
 
-        if not is_success(send_response):
-            error_details = get_error_details(send_response)
+        if not is_api_success(send_response):
+            error_details = extract_error_details(send_response)
             if verbose:
                 logger.warning("[FAILED] %s (ID: %s) - 发金币红包失败: %s", phone_number, stay_user_id, error_details)
             if attempt < retry:
@@ -300,8 +306,8 @@ def execute_send_gift_only(credential, room_id, gift_id, gift_count, total_amoun
             timestamp=str(int(time.time() * 1000)),
         )
 
-        if not is_success(send_response):
-            error_details = get_error_details(send_response)
+        if not is_api_success(send_response):
+            error_details = extract_error_details(send_response)
             if verbose:
                 logger.warning("[FAILED] %s (ID: %s) - 发礼物红包失败: %s", phone_number, stay_user_id, error_details)
             if attempt < retry:
@@ -351,6 +357,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="是否打印每条成功日志")
     parser.add_argument("--start-index", type=int, default=0, help="从第几个用户开始，默认0")
     parser.add_argument("--max-count", type=int, default=0, help="最多多少个用户参与抢红包，默认0表示全部")
+    parser.add_argument("--run-api", action="store_true", help="确认执行真实红包请求")
     
     # 红包参数（直接抢模式）
     parser.add_argument("--red-packet-id", type=int, help="红包ID（直接抢模式使用）")
@@ -376,6 +383,9 @@ def main():
 
     # 配置日志
     configure_logging(args.verbose)
+    if not args.run_api:
+        logger.error("拒绝执行真实红包请求；请明确添加 --run-api")
+        raise SystemExit(2)
 
     # 加载登录凭证
     credentials = load_login_credentials()

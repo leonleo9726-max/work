@@ -21,8 +21,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, OSError):
+    pass
+
 from common.http_utils import HttpUtils
-from common.business_utils import is_success, get_error_details, build_business_headers, extract_stay_red_packet_id
+from common.auth_utils import build_business_headers
+from common.response_utils import extract_error_details, extract_stay_red_packet_id, is_api_success
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -110,7 +116,7 @@ def execute_send_coin_only(credential, amount, count, condition, distribute_type
             timestamp=str(int(time.time() * 1000)),
         )
 
-        if is_success(response):
+        if is_api_success(response):
             if verbose:
                 logger.info("[OK] %s (ID: %s) - 红包发送成功", phone_number, stay_user_id)
             return {
@@ -121,7 +127,7 @@ def execute_send_coin_only(credential, amount, count, condition, distribute_type
             }
 
         # 提取错误详情
-        error_details = get_error_details(response)
+        error_details = extract_error_details(response)
         
         last_failure = {
             "phone": phone_number,
@@ -178,8 +184,8 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
             timestamp=str(int(time.time() * 1000)),
         )
 
-        if not is_success(send_response):
-            error_details = get_error_details(send_response)
+        if not is_api_success(send_response):
+            error_details = extract_error_details(send_response)
             last_failure = {
                 "phone": phone_number,
                 "stayUserId": stay_user_id,
@@ -229,7 +235,7 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
             timestamp=str(int(time.time() * 1000)),
         )
 
-        if is_success(receive_response):
+        if is_api_success(receive_response):
             if verbose:
                 logger.info("[OK] %s (ID: %s) - 发金币红包并抢红包成功, red_packet_id=%s", phone_number, stay_user_id, red_packet_id)
             return {
@@ -242,7 +248,7 @@ def execute_send_coin_and_receive(credential, amount, count, condition, distribu
             }
 
         # 抢红包失败
-        error_details = get_error_details(receive_response)
+        error_details = extract_error_details(receive_response)
         last_failure = {
             "phone": phone_number,
             "stayUserId": stay_user_id,
@@ -271,6 +277,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="是否打印每条成功日志")
     parser.add_argument("--start-index", type=int, default=0, help="从第几个用户开始，默认0")
     parser.add_argument("--max-count", type=int, default=0, help="最多发送多少个用户，默认0表示全部")
+    parser.add_argument("--run-api", action="store_true", help="确认执行真实红包请求")
     
     # 红包参数
     parser.add_argument("--amount", type=int, default=20000, help="红包总金额（单位：分），默认20000")
@@ -288,6 +295,9 @@ def main():
 
     # 配置日志
     configure_logging(args.verbose)
+    if not args.run_api:
+        logger.error("拒绝执行真实红包请求；请明确添加 --run-api")
+        raise SystemExit(2)
 
     # 加载登录凭证
     credentials = load_login_credentials()

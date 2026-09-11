@@ -21,17 +21,24 @@ class EastPointClient:
         path: str,
         payload: dict,
         token: Optional[str] = None,
+        user_id: Optional[str] = None,
         locale: str = "en",
         timestamp: Optional[str] = None,
+        extra_headers: Optional[dict] = None,
+        plain_json: bool = False,
     ) -> Any:
         headers = settings.build_common_encrypted_headers()
+        if extra_headers:
+            headers.update(extra_headers)
         if token:
             headers["token"] = token
+        if user_id:
+            headers["user-id"] = str(user_id)
         return self._transport.post(
             url=f"{self._base_url}{path}",
             data=payload,
             headers=headers,
-            encrypt_key=self._encrypt_key,
+            encrypt_key=None if plain_json else self._encrypt_key,
             locale=locale,
             timestamp=timestamp,
         )

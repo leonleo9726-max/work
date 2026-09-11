@@ -53,7 +53,7 @@ def load_unique_ids_from_csv():
         reader = csv.DictReader(file)
         for row in reader:
             unique_id = (row.get("uniqueId") or "").strip()
-            if unique_id:
+            if unique_id and not unique_id.startswith("#"):
                 unique_ids.append(unique_id)
     return unique_ids
 
@@ -100,7 +100,7 @@ def create_send_code_params(phone_number, area_code="86", user_sms_type=0, **kwa
         'platformType': 0,
         'appType': 0,
         'variantType': 0,
-        'appVersion': '2.1.3',
+        'appVersion': '2.3.0',
         'buildVersion': 317,
         'osModel': 'RMX3511',
         'osVersion': '33',
